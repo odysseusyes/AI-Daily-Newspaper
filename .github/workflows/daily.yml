@@ -15,7 +15,7 @@ on:
         required: false
         default: ''
       preview_only:
-        description: '仅预览不写入 Obsidian (true/false)'
+        description: '保留参数，占位用；纯 GitHub 版会忽略此参数'
         required: false
         default: 'false'
 
@@ -78,17 +78,6 @@ jobs:
           git commit -m "chore: daily AI report (${{ steps.date.outputs.DATE }})"
           git push
 
-      - name: 📤 推送到 Obsidian (via Git Sync)
-        if: ${{ github.event.inputs.preview_only != 'true' }}
-        env:
-          OBSIDIAN_VAULT_REPO: ${{ secrets.OBSIDIAN_VAULT_REPO }}
-          OBSIDIAN_TOKEN: ${{ secrets.OBSIDIAN_TOKEN }}
-          TARGET_DATE: ${{ steps.date.outputs.DATE }}
-        run: |
-          python scripts/push_to_obsidian.py \
-            --file "reports/AI日报_$TARGET_DATE.md" \
-            --vault-folder "AI日报"
-
       - name: 💾 上传产物（备份）
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +91,7 @@ jobs:
           echo "- **日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **生成时间：** ${{ steps.date.outputs.DATETIME }} (北京时间)" >> $GITHUB_STEP_SUMMARY
           echo "- **文件：** AI日报_${{ steps.date.outputs.DATE }}.md" >> $GITHUB_STEP_SUMMARY
+          echo "- **发布位置：** 仓库 reports/ 目录" >> $GITHUB_STEP_SUMMARY
           if [ -f "reports/AI日报_${{ steps.date.outputs.DATE }}.md" ]; then
             LINES=$(wc -l < "reports/AI日报_${{ steps.date.outputs.DATE }}.md")
             echo "- **行数：** $LINES 行" >> $GITHUB_STEP_SUMMARY
