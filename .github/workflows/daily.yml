@@ -2,12 +2,12 @@ name: 🤖 AI Daily Digest
 
 on:
   schedule:
-    # 每天 UTC 00:00 = 北京时间 08:00
-    - cron: '0 0 * * *'
+    # 每天 UTC 00:20 = 北京时间 08:20
+    - cron: '20 0 * * *'
   workflow_dispatch:
     inputs:
       date:
-        description: '指定日报版次日期 (YYYY-MM-DD)，留空为昨天'
+        description: '指定输出文件日期 (YYYY-MM-DD)，留空为今天'
         required: false
         default: ''
       focus:
@@ -59,15 +59,21 @@ jobs:
           if [ -n "${{ github.event.inputs.date }}" ]; then
             REPORT_DATE="${{ github.event.inputs.date }}"
           else
-            REPORT_DATE="$(TZ='Asia/Shanghai' date -v-1d +%Y-%m-%d 2>/dev/null || TZ='Asia/Shanghai' date -d 'yesterday' +%Y-%m-%d)"
+            REPORT_DATE="$(TZ='Asia/Shanghai' date +%Y-%m-%d)"
           fi
-          NEXT_DATE="$(python - <<PY
-from datetime import datetime, timedelta
-print((datetime.strptime('${REPORT_DATE}', '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d'))
+          REPORT_NOW_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          WINDOW_RANGE="$(python - <<PY
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+end_utc = datetime.strptime('${REPORT_NOW_UTC}', '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+start_local = (end_utc - timedelta(hours=24)).astimezone(ZoneInfo('Asia/Shanghai'))
+end_local = end_utc.astimezone(ZoneInfo('Asia/Shanghai'))
+print(f\"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)\")
 PY
 )"
           echo "DATE=${REPORT_DATE}" >> $GITHUB_OUTPUT
-          echo "NEXT_DATE=${NEXT_DATE}" >> $GITHUB_OUTPUT
+          echo "REPORT_NOW_UTC=${REPORT_NOW_UTC}" >> $GITHUB_OUTPUT
+          echo "WINDOW_RANGE=${WINDOW_RANGE}" >> $GITHUB_OUTPUT
           echo "DATETIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
 
       - name: 🔍 抓取并生成日报
@@ -75,6 +81,7 @@ PY
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_MODEL: deepseek-chat
           TARGET_DATE: ${{ steps.date.outputs.DATE }}
+          REPORT_NOW_UTC: ${{ steps.date.outputs.REPORT_NOW_UTC }}
           FOCUS: ${{ github.event.inputs.focus }}
           TIKTOK_RAPIDAPI_KEY: ${{ secrets.TIKTOK_RAPIDAPI_KEY }}
           TIKTOK_RAPIDAPI_HOST: ${{ secrets.TIKTOK_RAPIDAPI_HOST }}
@@ -106,8 +113,8 @@ PY
       - name: ✅ 输出摘要
         run: |
           echo "## 📰 AI日报生成完成" >> $GITHUB_STEP_SUMMARY
-          echo "- **版次日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **时间窗口：** ${{ steps.date.outputs.DATE }} 08:00 - ${{ steps.date.outputs.NEXT_DATE }} 08:00 (Asia/Shanghai)" >> $GITHUB_STEP_SUMMARY
+          echo "- **文件日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **时间窗口：** ${{ steps.date.outputs.WINDOW_RANGE }}" >> $GITHUB_STEP_SUMMARY
           echo "- **生成时间：** ${{ steps.date.outputs.DATETIME }} (北京时间)" >> $GITHUB_STEP_SUMMARY
           echo "- **文件：** AI日报_${{ steps.date.outputs.DATE }}.md" >> $GITHUB_STEP_SUMMARY
           echo "- **发布位置：** 仓库 reports/ 目录" >> $GITHUB_STEP_SUMMARY

@@ -149,23 +149,27 @@ def display_date_for_item(item: Dict[str, str]) -> str:
     return dt.astimezone(SH_TZ).strftime("%Y-%m-%d")
 
 
-def parse_report_date(report_date: str) -> datetime:
-    return datetime.strptime(report_date, "%Y-%m-%d").replace(tzinfo=SH_TZ)
-
-
 def default_report_date() -> str:
-    return (datetime.now(SH_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
+    return datetime.now(SH_TZ).strftime("%Y-%m-%d")
 
 
-def compute_report_window(report_date: str) -> Tuple[datetime, datetime]:
-    edition_day = parse_report_date(report_date)
-    window_start = edition_day.replace(hour=8, minute=0, second=0, microsecond=0)
-    window_end = window_start + timedelta(days=1)
-    return window_start.astimezone(timezone.utc), window_end.astimezone(timezone.utc)
+def resolve_report_end_utc() -> datetime:
+    override = os.environ.get("REPORT_NOW_UTC", "").strip()
+    if override:
+        dt = parse_datetime_safe(override)
+        if dt:
+            return dt
+    return datetime.now(timezone.utc)
 
 
-def format_report_window(report_date: str) -> str:
-    window_start_utc, window_end_utc = compute_report_window(report_date)
+def compute_report_window(report_end_utc: datetime) -> Tuple[datetime, datetime]:
+    window_end = report_end_utc
+    window_start = report_end_utc - timedelta(hours=24)
+    return window_start, window_end
+
+
+def format_report_window(report_end_utc: datetime) -> str:
+    window_start_utc, window_end_utc = compute_report_window(report_end_utc)
     start_local = window_start_utc.astimezone(SH_TZ)
     end_local = window_end_utc.astimezone(SH_TZ)
     return f"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)"
@@ -736,9 +740,9 @@ def dedupe_items(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return result
 
 
-def collect_candidates(report_date: str, focus: str, config: Dict) -> List[Dict[str, str]]:
+def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> List[Dict[str, str]]:
     items: List[Dict[str, str]] = []
-    window_start_utc, window_end_utc = compute_report_window(report_date)
+    window_start_utc, window_end_utc = compute_report_window(report_end_utc)
     for source in config.get("sources", []):
         if source.get("enabled", True) is False:
             continue
@@ -912,13 +916,14 @@ def generate_daily(target_date: str, focus: str) -> str:
         raise RuntimeError("缺少环境变量 DEEPSEEK_API_KEY")
 
     config = load_json(CONFIG_PATH)
-    candidates = collect_candidates(target_date, focus, config)
+    report_end_utc = resolve_report_end_utc()
+    candidates = collect_candidates(report_end_utc, focus, config)
     if not candidates:
-        raise RuntimeError("未抓取到报告窗口内且日期可核验的可用候选内容")
+        raise RuntimeError("未抓取到最近24小时窗口内且日期可核验的可用候选内容")
 
     client = OpenAI(api_key=api_key, base_url=DEFAULT_BASE_URL)
     skill = load_skill()
-    report_window = format_report_window(target_date)
+    report_window = format_report_window(report_end_utc)
     print(f"🔍 已抓取候选内容 {len(candidates)} 条，开始调用 DeepSeek 生成日报...", flush=True)
     feedback: List[str] = []
     for attempt in range(3):
