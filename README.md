@@ -51,6 +51,7 @@ Fork 本项目到你的 GitHub 账号。
 | Secret 名称 | 说明 | 必填 |
 |------------|------|------|
 | `DEEPSEEK_API_KEY` | DeepSeek API Key | ✅ 必填 |
+| `TWITTERAPI_KEY` | twitterapi.io 的 X API Key（启用可核验时间的 X 抓取） | 可选 |
 | `TIKTOK_RAPIDAPI_KEY` | TikTok RapidAPI Key（启用 TikTok 补充源） | 可选 |
 | `TIKTOK_RAPIDAPI_HOST` | TikTok RapidAPI Host，默认 `tiktok-api23.p.rapidapi.com` | 可选 |
 
@@ -149,12 +150,12 @@ cp -r skills/ai-daily ~/.claude/skills/
 **社区 / 社媒 / 视频**
 - Hacker News
 - Reddit（通过 Redlib 镜像）
-- X（通过 `r.jina.ai` 代理）
+- X（`twitterapi.io` 优先，`r.jina.ai` 回退）
 - YouTube（通过 `r.jina.ai` 代理）
 - Product Hunt AI
 - TikTok（可选，需 RapidAPI Key）
 
-> 当前实现已经接入 X / Reddit / YouTube / Product Hunt。TikTok 需要额外 Secret 才会返回内容。
+> 当前实现已经接入 X / Reddit / YouTube / Product Hunt。若配置 `TWITTERAPI_KEY`，X 会优先使用带 `createdAt` 的 API 结果；TikTok 需要额外 Secret 才会返回内容。
 
 ---
 

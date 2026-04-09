@@ -72,6 +72,8 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_MODEL: deepseek-chat
+          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
+          TWITTERAPI_BASE_URL: https://api.twitterapi.io
           TARGET_DATE: ${{ steps.date.outputs.DATE }}
           REPORT_NOW_UTC: ${{ steps.date.outputs.REPORT_NOW_UTC }}
           FOCUS: ${{ github.event.inputs.focus }}

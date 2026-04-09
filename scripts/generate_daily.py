@@ -34,6 +34,7 @@ DEFAULT_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 DEFAULT_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 JINA_PREFIX = "https://r.jina.ai/http://"
 SH_TZ = ZoneInfo("Asia/Shanghai")
+TWITTERAPI_BASE_URL = os.environ.get("TWITTERAPI_BASE_URL", "https://api.twitterapi.io").rstrip("/")
 
 AI_KEYWORDS = [
     "ai",
@@ -588,7 +589,62 @@ def split_x_posts(text: str, source_url: str, source: Dict[str, str]) -> List[Di
     return items
 
 
+def x_handle_from_url(url: str) -> str:
+    path = urlparse(url).path.strip("/")
+    return path.split("/", 1)[0] if path else ""
+
+
+def fetch_x_api_items(source: Dict[str, str]) -> List[Dict[str, str]]:
+    api_key = os.environ.get("TWITTERAPI_KEY", "").strip()
+    if not api_key:
+        return []
+
+    handle = x_handle_from_url(source.get("url", ""))
+    if not handle:
+        return []
+
+    endpoint = f"{TWITTERAPI_BASE_URL}/twitter/user/last_tweets"
+    try:
+        resp = requests.get(
+            endpoint,
+            params={
+                "userName": handle,
+                "includeReplies": "false",
+            },
+            headers={"X-API-Key": api_key, "Accept": "application/json"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception:
+        return []
+
+    tweets = payload.get("tweets", []) if isinstance(payload, dict) else []
+    items = []
+    for tweet in tweets:
+        text = clean_text(tweet.get("text", ""))
+        if len(text) < 20:
+            continue
+        items.append(
+            {
+                "title": text.split(".")[0][:120],
+                "summary": text[:500],
+                "url": clean_text(tweet.get("url", "")),
+                "source": source["name"],
+                "platform": source["platform"],
+                "published_at": clean_text(tweet.get("createdAt", ""))[:80],
+                "published_verified": bool(parse_datetime_safe(clean_text(tweet.get("createdAt", ""))[:80])),
+            }
+        )
+        if len(items) >= source.get("limit", 3):
+            break
+    return items
+
+
 def fetch_x_jina_items(source: Dict[str, str]) -> List[Dict[str, str]]:
+    api_items = fetch_x_api_items(source)
+    if api_items:
+        return api_items
     try:
         text, _ = request_text_with_fallback([as_jina_url(source["url"])])
     except Exception:
