@@ -893,6 +893,73 @@ def validate_generated_markdown(markdown: str, candidates: List[Dict[str, str]])
     return errors
 
 
+def normalize_deep_report_metadata(markdown: str, candidates: List[Dict[str, str]]) -> str:
+    lines = markdown.splitlines()
+    candidate_map = {item.get("url", ""): item for item in candidates if item.get("url")}
+    output: List[str] = []
+    in_deep_section = False
+    current_candidate = None
+    meta_written = False
+
+    def parse_heading_url(line: str) -> str:
+        match = re.match(r"^### \[.+\]\((https?://.+)\)$", line.strip())
+        return match.group(1).strip() if match else ""
+
+    def metadata_line(candidate: Dict[str, str]) -> str:
+        return f"📅 {candidate.get('date_label', '时间待核实')} ｜ 来源：{candidate.get('source', '')}"
+
+    def flush_missing_metadata():
+        nonlocal meta_written
+        if current_candidate and not meta_written:
+            output.append(metadata_line(current_candidate))
+            meta_written = True
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith("## 📌 深度报道"):
+            in_deep_section = True
+            current_candidate = None
+            meta_written = False
+            output.append(line)
+            continue
+
+        if in_deep_section and stripped.startswith("## ") and not stripped.startswith("## 📌 深度报道"):
+            flush_missing_metadata()
+            in_deep_section = False
+            current_candidate = None
+            meta_written = False
+            output.append(line)
+            continue
+
+        if not in_deep_section:
+            output.append(line)
+            continue
+
+        if stripped.startswith("### "):
+            flush_missing_metadata()
+            current_candidate = candidate_map.get(parse_heading_url(line))
+            meta_written = False
+            output.append(line)
+            continue
+
+        if current_candidate and stripped.startswith("📅 "):
+            output.append(metadata_line(current_candidate))
+            meta_written = True
+            continue
+
+        if current_candidate and not meta_written and stripped and not stripped.startswith("`#"):
+            output.append(metadata_line(current_candidate))
+            meta_written = True
+
+        output.append(line)
+
+    if in_deep_section:
+        flush_missing_metadata()
+
+    return "\n".join(output)
+
+
 def request_markdown_from_model(client: OpenAI, skill: str, target_date: str, focus: str, candidates: List[Dict[str, str]], report_window: str, extra_feedback: str = "") -> str:
     user_prompt = build_user_prompt(target_date, focus, candidates, report_window)
     if extra_feedback:
@@ -931,6 +998,7 @@ def generate_daily(target_date: str, focus: str) -> str:
         if not content:
             feedback = ["输出为空，必须输出完整 Markdown 日报"]
             continue
+        content = normalize_deep_report_metadata(content, candidates)
         errors = validate_generated_markdown(content, candidates)
         if not errors:
             return content
