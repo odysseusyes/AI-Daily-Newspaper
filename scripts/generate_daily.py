@@ -78,6 +78,21 @@ FOCUS_PROMPTS = {
     "": "优先保留底层能力、商业落地、应用案例、使用方法、未来趋势和重要发布。",
 }
 
+SECTION_TARGETS = {
+    "X / Twitter 重点舆情": 15,
+    "YouTube 核心内容": 5,
+    "TechCrunch 深度文章": 6,
+    "其他平台快讯": 12,
+}
+
+BASE_WINDOW_HOURS = 36
+PLATFORM_WINDOW_HOURS = {
+    "x": 48,
+    "reddit": 48,
+    "tiktok": 48,
+    "youtube": 72,
+}
+
 PRIMARY_PLATFORMS = {"official", "media", "research"}
 SIGNAL_PLATFORMS = {"x", "youtube", "reddit", "community"}
 RELEASE_TERMS = ["发布", "推出", "上线", "开源", "宣布", "launch", "release", "introduc", "debut"]
@@ -123,11 +138,12 @@ def parse_datetime_safe(value: str):
     return None
 
 
-def is_within_window(published_at: str, window_start_utc: datetime, window_end_utc: datetime) -> bool:
+def is_within_window(published_at: str, report_end_utc: datetime, window_hours: int) -> bool:
     dt = parse_datetime_safe(published_at)
     if not dt:
         return False
-    return window_start_utc <= dt < window_end_utc
+    window_start_utc = report_end_utc - timedelta(hours=window_hours)
+    return window_start_utc <= dt < report_end_utc
 
 
 def is_primary_source_platform(platform: str) -> bool:
@@ -163,17 +179,23 @@ def resolve_report_end_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def compute_report_window(report_end_utc: datetime) -> Tuple[datetime, datetime]:
+def compute_report_window(report_end_utc: datetime, window_hours: int = BASE_WINDOW_HOURS) -> Tuple[datetime, datetime]:
     window_end = report_end_utc
-    window_start = report_end_utc - timedelta(hours=24)
+    window_start = report_end_utc - timedelta(hours=window_hours)
     return window_start, window_end
 
 
 def format_report_window(report_end_utc: datetime) -> str:
-    window_start_utc, window_end_utc = compute_report_window(report_end_utc)
+    window_start_utc, window_end_utc = compute_report_window(report_end_utc, BASE_WINDOW_HOURS)
     start_local = window_start_utc.astimezone(SH_TZ)
     end_local = window_end_utc.astimezone(SH_TZ)
-    return f"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)"
+    overrides = " | ".join(
+        f"{platform}:{hours}h" for platform, hours in PLATFORM_WINDOW_HOURS.items()
+    )
+    return (
+        f"主窗口 {BASE_WINDOW_HOURS}h：{start_local.strftime('%Y-%m-%d %H:%M')} - "
+        f"{end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)；平台补位：{overrides}"
+    )
 
 
 def as_jina_url(url: str) -> str:
@@ -820,7 +842,7 @@ def init_bucket_stats() -> Dict[str, object]:
             "AI 弱相关": 0,
             "低信息密度": 0,
             "时间不可核验": 0,
-            "超出 24 小时窗口": 0,
+            "超出时效窗口": 0,
         },
     }
 
@@ -850,7 +872,100 @@ def render_collection_stats(stats: Dict[str, Dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
-def inject_collection_stats(markdown: str, stats: Dict[str, Dict[str, object]]) -> str:
+def display_source_name(source: Dict[str, str]) -> str:
+    fetch_type = source.get("type", "")
+    if fetch_type == "x_jina":
+        return "X"
+    if fetch_type == "youtube_jina":
+        return "YouTube"
+    if fetch_type == "redlib":
+        return "Reddit"
+    if fetch_type == "tiktok_rapidapi":
+        return "TikTok"
+    if fetch_type == "hn":
+        return "Hacker News"
+    name = source.get("name", "").strip()
+    if "Google Developers" in name or "Google Cloud" in name:
+        return "Google APIs"
+    if "NYTimes" in name:
+        return "NYTimes"
+    if "TechCrunch" in name:
+        return "TechCrunch"
+    if "The Verge" in name:
+        return "The Verge"
+    if "MIT Technology Review" in name:
+        return "MIT Technology Review"
+    if "OpenAI" in name:
+        return "OpenAI"
+    if "Anthropic" in name:
+        return "Anthropic"
+    if "DeepMind" in name:
+        return "Google DeepMind"
+    if "Meta" in name:
+        return "Meta AI"
+    if "Hugging Face" in name:
+        return "Hugging Face Papers"
+    if "Product Hunt" in name:
+        return "Product Hunt AI"
+    return name or "未知来源"
+
+
+def unique_preserving_order(items: List[str]) -> List[str]:
+    seen = set()
+    result = []
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def section_attainment(candidates: List[Dict[str, str]]) -> Dict[str, int]:
+    counts = {
+        "X / Twitter 重点舆情": 0,
+        "YouTube 核心内容": 0,
+        "TechCrunch 深度文章": 0,
+        "其他平台快讯": 0,
+    }
+    for item in candidates:
+        source = item.get("source", "")
+        platform = item.get("platform", "")
+        if platform == "x":
+            counts["X / Twitter 重点舆情"] += 1
+        elif platform == "youtube":
+            counts["YouTube 核心内容"] += 1
+        elif "TechCrunch" in source:
+            counts["TechCrunch 深度文章"] += 1
+        else:
+            counts["其他平台快讯"] += 1
+    return counts
+
+
+def render_coverage_overview(config: Dict, candidates: List[Dict[str, str]], stats: Dict[str, Dict[str, object]]) -> str:
+    configured = unique_preserving_order([display_source_name(source) for source in config.get("sources", []) if source.get("enabled", True) is not False])
+    actual = [name for name, bucket in stats.items() if int(bucket.get("passed", 0)) > 0]
+    gaps = [name for name in configured if name not in actual]
+    attainment = section_attainment(candidates)
+    actual_summary = ", ".join(f"{name}:{int(stats[name].get('passed', 0))}" for name in actual) if actual else "-"
+    gap_summary = ", ".join(gaps) if gaps else "无"
+    target_summary = " | ".join(f"{name} {target}" for name, target in SECTION_TARGETS.items())
+    attain_summary = " | ".join(f"{name} {attainment.get(name, 0)}/{target}" for name, target in SECTION_TARGETS.items())
+    configured_summary = ", ".join(configured) if configured else "-"
+    lines = [
+        "## 📈 覆盖概览",
+        "",
+        f"> **当前配置抓取平台**：{configured_summary}",
+        f"> **实际平台覆盖**：{actual_summary}",
+        f"> **覆盖缺口**：{gap_summary}",
+        f"> **重点版块目标**：{target_summary}",
+        f"> **重点版块达成**：{attain_summary}",
+    ]
+    return "\n".join(lines)
+
+
+def inject_collection_stats(markdown: str, config: Dict, candidates: List[Dict[str, str]], stats: Dict[str, Dict[str, object]]) -> str:
+    coverage_block = render_coverage_overview(config, candidates, stats)
     stats_block = render_collection_stats(stats)
     lines = markdown.splitlines()
     if not lines:
@@ -875,14 +990,13 @@ def inject_collection_stats(markdown: str, stats: Dict[str, Dict[str, object]]) 
 
     prefix = lines[:insert_at]
     suffix = lines[insert_at:]
-    injected = prefix + ["", stats_block, ""] + suffix
+    injected = prefix + ["", coverage_block, "", stats_block, ""] + suffix
     return "\n".join(injected)
 
 
 def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Tuple[List[Dict[str, str]], Dict[str, Dict[str, object]]]:
     items: List[Dict[str, str]] = []
     stats: Dict[str, Dict[str, object]] = {}
-    window_start_utc, window_end_utc = compute_report_window(report_end_utc)
     for source in config.get("sources", []):
         if source.get("enabled", True) is False:
             continue
@@ -922,14 +1036,16 @@ def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Tu
         if not item.get("published_verified", False):
             stats[bucket_name]["filtered"]["时间不可核验"] += 1
             continue
-        if not is_within_window(item.get("published_at", ""), window_start_utc, window_end_utc):
-            stats[bucket_name]["filtered"]["超出 24 小时窗口"] += 1
+        window_hours = PLATFORM_WINDOW_HOURS.get(item.get("platform", ""), BASE_WINDOW_HOURS)
+        if not is_within_window(item.get("published_at", ""), report_end_utc, window_hours):
+            stats[bucket_name]["filtered"]["超出时效窗口"] += 1
             continue
         item["score"] = score_item(item, focus)
         item["date_label"] = display_date_for_item(item)
         item["is_primary_source"] = is_primary_source_platform(item.get("platform", ""))
         item["is_signal_source"] = is_signal_platform(item.get("platform", ""))
         item["candidate_id"] = f"C{idx:03d}"
+        item["window_hours"] = window_hours
         filtered.append(item)
         stats[bucket_name]["passed"] = int(stats[bucket_name]["passed"]) + 1
     filtered.sort(key=lambda x: x.get("score", 0), reverse=True)
@@ -1167,7 +1283,7 @@ def generate_daily(target_date: str, focus: str) -> str:
             feedback = ["输出为空，必须输出完整 Markdown 日报"]
             continue
         content = normalize_deep_report_metadata(content, candidates)
-        content = inject_collection_stats(content, collection_stats)
+        content = inject_collection_stats(content, config, candidates, collection_stats)
         errors = validate_generated_markdown(content, candidates)
         if not errors:
             return content

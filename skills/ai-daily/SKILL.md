@@ -19,7 +19,7 @@ description: >
 
 ### Step 1 — 抓取数据源
 
-按优先级依次抓取以下来源（滚动 24 小时窗口：`当前生成时刻` 往前 24 小时）：
+按优先级依次抓取以下来源（分层时效窗口：主窗口 36 小时，X/Reddit/TikTok 48 小时，YouTube 72 小时）：
 
 **Tier 1：官方 & 权威媒体（先抓）**
 - TechCrunch AI：https://techcrunch.com/category/artificial-intelligence/
@@ -81,7 +81,7 @@ created: {YYYY-MM-DD}T08:00:00
 
 # AI日报 | {YYYY-MM-DD}
 
-> ⏱ 时间范围：当前生成时刻往前 24 小时（Asia/Shanghai）
+> ⏱ 时间范围：主窗口 36 小时，X/Reddit/TikTok 48 小时，YouTube 72 小时（Asia/Shanghai）
 > 📡 数据源：TechCrunch / 官方博客 / HuggingFace / Hacker News
 
 ---
@@ -149,7 +149,7 @@ created: {YYYY-MM-DD}T08:00:00
 ## 注意事项
 
 - 优先使用公开网页抓取到的候选素材，不要编造未抓到的信息
-- 报告窗口固定为“当前生成时刻往前 24 小时”；只保留窗口内且发布时间可核验的内容
+- 报告窗口采用分层时效：主窗口 36 小时；X/Reddit/TikTok 48 小时；YouTube 72 小时；只保留窗口内且发布时间可核验的内容
 - “发布 / 推出 / 上线 / 开源 / 宣布”类重大事实，必须来自官方/权威媒体/论文源，且日期可核验
 - X / YouTube / Reddit / Hacker News 只能作为观点或社区信号来源，不能单独作为模型发布事实源
 - 每条深度报道不超过 300 字
