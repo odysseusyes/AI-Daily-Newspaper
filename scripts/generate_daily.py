@@ -5,12 +5,13 @@ AI 每日日报生成脚本
 """
 
 import argparse
+from email.utils import parsedate_to_datetime
 import json
 import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 from urllib.parse import urljoin, urlparse
@@ -74,6 +75,10 @@ FOCUS_PROMPTS = {
     "": "优先保留底层能力、商业落地、应用案例、使用方法、未来趋势和重要发布。",
 }
 
+PRIMARY_PLATFORMS = {"official", "media", "research"}
+SIGNAL_PLATFORMS = {"x", "youtube", "reddit", "community"}
+RELEASE_TERMS = ["发布", "推出", "上线", "开源", "宣布", "launch", "release", "introduc", "debut"]
+
 
 def load_json(path: Path) -> Dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -90,6 +95,57 @@ def clean_text(text: str) -> str:
 def is_low_value(text: str) -> bool:
     haystack = (text or "").lower()
     return any(pattern in haystack for pattern in LOW_VALUE_PATTERNS)
+
+
+def parse_datetime_safe(value: str):
+    value = clean_text(value)
+    if not value:
+        return None
+    for parser in (
+        lambda v: datetime.fromisoformat(v.replace("Z", "+00:00")),
+        parsedate_to_datetime,
+    ):
+        try:
+            dt = parser(value)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except Exception:
+            continue
+    if value.isdigit():
+        try:
+            return datetime.fromtimestamp(int(value), tz=timezone.utc)
+        except Exception:
+            return None
+    return None
+
+
+def has_verified_recent_date(published_at: str, max_age_days: int = 7) -> bool:
+    dt = parse_datetime_safe(published_at)
+    if not dt:
+        return False
+    now = datetime.now(timezone.utc)
+    return now - dt <= timedelta(days=max_age_days)
+
+
+def is_primary_source_platform(platform: str) -> bool:
+    return platform in PRIMARY_PLATFORMS
+
+
+def is_signal_platform(platform: str) -> bool:
+    return platform in SIGNAL_PLATFORMS
+
+
+def contains_release_claim(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(term in lowered for term in RELEASE_TERMS)
+
+
+def display_date_for_item(item: Dict[str, str]) -> str:
+    dt = parse_datetime_safe(item.get("published_at", ""))
+    if not dt:
+        return "时间待核实"
+    return dt.astimezone().strftime("%Y-%m-%d")
 
 
 def as_jina_url(url: str) -> str:
@@ -192,6 +248,7 @@ def extract_article_snapshot(url: str, source_name: str, platform: str) -> Dict[
             "source": source_name,
             "platform": platform,
             "published_at": published,
+            "published_verified": bool(parse_datetime_safe(published)),
         }
 
     soup = BeautifulSoup(text, "html.parser")
@@ -248,6 +305,7 @@ def extract_article_snapshot(url: str, source_name: str, platform: str) -> Dict[
         "source": source_name,
         "platform": platform,
         "published_at": published[:80],
+        "published_verified": bool(parse_datetime_safe(published[:80])),
     }
 
 
@@ -343,6 +401,7 @@ def fetch_rss_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                 "source": source["name"],
                 "platform": source["platform"],
                 "published_at": published[:80],
+                "published_verified": bool(parse_datetime_safe(published[:80])),
             }
         )
     return items
@@ -374,6 +433,7 @@ def fetch_atom_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                 "source": source["name"],
                 "platform": source["platform"],
                 "published_at": published[:80],
+                "published_verified": bool(parse_datetime_safe(published[:80])),
             }
         )
     return items
@@ -407,6 +467,7 @@ def fetch_hn_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                 "source": source["name"],
                 "platform": source["platform"],
                 "published_at": str((payload or {}).get("time", "")),
+                "published_verified": bool(parse_datetime_safe(str((payload or {}).get("time", "")))),
             }
         )
         if len(items) >= source.get("limit", 8):
@@ -443,6 +504,7 @@ def fetch_redlib_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                 "source": source["name"],
                 "platform": source["platform"],
                 "published_at": published[:80],
+                "published_verified": bool(parse_datetime_safe(published[:80])),
             }
         )
     return items
@@ -491,6 +553,7 @@ def split_x_posts(text: str, source_url: str, source: Dict[str, str]) -> List[Di
                 "source": source["name"],
                 "platform": source["platform"],
                 "published_at": "",
+                "published_verified": False,
             }
         )
         if len(items) >= source.get("limit", 3):
@@ -534,6 +597,7 @@ def fetch_youtube_jina_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                     "source": source["name"],
                     "platform": source["platform"],
                     "published_at": "",
+                    "published_verified": False,
                 }
             )
         if len(items) >= source.get("limit", 5):
@@ -573,6 +637,7 @@ def fetch_tiktok_items(source: Dict[str, str]) -> List[Dict[str, str]]:
                     "source": source["name"],
                     "platform": source["platform"],
                     "published_at": str(entry.get("createTime", "")),
+                    "published_verified": bool(parse_datetime_safe(str(entry.get("createTime", "")))),
                 }
             )
         if len(items) >= source.get("limit", 5):
@@ -656,13 +721,17 @@ def collect_candidates(focus: str, config: Dict) -> List[Dict[str, str]]:
         items.extend(fetch_source(source))
 
     filtered = []
-    for item in dedupe_items(items):
+    for idx, item in enumerate(dedupe_items(items), start=1):
         text = f"{item.get('title', '')} {item.get('summary', '')}"
         if not is_ai_related(text):
             continue
         if is_low_value(text):
             continue
         item["score"] = score_item(item, focus)
+        item["date_label"] = display_date_for_item(item)
+        item["is_primary_source"] = is_primary_source_platform(item.get("platform", ""))
+        item["is_signal_source"] = is_signal_platform(item.get("platform", ""))
+        item["candidate_id"] = f"C{idx:03d}"
         filtered.append(item)
     filtered.sort(key=lambda x: x.get("score", 0), reverse=True)
     return filtered[: config.get("max_candidates", 60)]
@@ -687,7 +756,10 @@ def build_system_prompt(skill_content: str) -> str:
 2. 只保留信息密度高、与 AI 主线强相关的内容。
 3. 摘要必须具体，不要泛泛而谈。
 4. 每条深度报道必须包含：深度摘要、关键判断、对我的帮助。
-5. X 至少优先使用 10-15 条高价值帖子；YouTube 优先使用 5 条内最有价值的视频；其余平台宁缺毋滥。
+5. 每条深度报道标题必须使用 Markdown 超链接：### [中文标题](原文链接)
+6. 任何“发布/推出/上线/开源/宣布”类重大事实，必须来自 primary source 候选（official/media/research）且 `published_verified=true`。
+7. X / YouTube / Reddit / Hacker News 只能进入“观点 / 社区信号”或“快讯”，不能作为模型发布事实的一手依据。
+8. 如果候选没有可核验日期，必须写“时间待核实”，不能擅自写具体日期。
 """
 
 
@@ -708,11 +780,79 @@ def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, s
 - 官方发布、研究突破、商业落地优先
 - 不要编造候选中不存在的发布日期、数据或观点
 - 如果候选里某个平台质量低，可以少写，但不要用无关信息凑数
+- 所有深度报道标题必须写成 `[标题](url)`，不得写“（含超链接）”占位词
+- 任何重大发布类表述都必须能在候选的 `published_verified=true` 且 `is_primary_source=true` 中找到依据
+- `is_signal_source=true` 的候选不要放进“深度报道”
 
 候选素材如下：
 {payload}
 
 直接输出最终 Markdown，不要添加额外说明。"""
+
+
+def validate_generated_markdown(markdown: str) -> List[str]:
+    errors: List[str] = []
+    lines = markdown.splitlines()
+    in_deep_section = False
+    current_title = ""
+    current_source_line = ""
+    current_date_line = ""
+
+    def flush_current():
+        nonlocal current_title, current_source_line, current_date_line
+        if not current_title:
+            return
+        if not re.match(r"^### \[.+\]\(https?://.+\)$", current_title.strip()):
+            errors.append(f"深度报道标题不是有效超链接: {current_title}")
+        if "（含超链接）" in current_title:
+            errors.append(f"标题仍包含占位词“含超链接”: {current_title}")
+        release_text = f"{current_title} {current_source_line}".lower()
+        if contains_release_claim(release_text) and re.search(r"来源：.*(X|YouTube|Reddit|Hacker News)", current_source_line):
+            errors.append(f"发布类内容错误地使用了社媒/社区源: {current_title}")
+        if current_date_line and "📅" in current_date_line:
+            if "时间待核实" not in current_date_line and not re.search(r"\d{4}-\d{2}-\d{2}", current_date_line):
+                errors.append(f"日期格式无效: {current_date_line}")
+        current_title = ""
+        current_source_line = ""
+        current_date_line = ""
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## 📌 深度报道"):
+            in_deep_section = True
+            continue
+        if stripped.startswith("## ") and not stripped.startswith("## 📌 深度报道"):
+            if in_deep_section:
+                flush_current()
+            in_deep_section = False
+        if not in_deep_section:
+            continue
+        if stripped.startswith("### "):
+            flush_current()
+            current_title = stripped
+        elif stripped.startswith("📅 "):
+            current_date_line = stripped
+            current_source_line = stripped
+    if in_deep_section:
+        flush_current()
+    return errors
+
+
+def request_markdown_from_model(client: OpenAI, skill: str, target_date: str, focus: str, candidates: List[Dict[str, str]], extra_feedback: str = "") -> str:
+    user_prompt = build_user_prompt(target_date, focus, candidates)
+    if extra_feedback:
+        user_prompt += f"\n\n上一次输出存在这些错误，必须全部修正后再输出：\n- " + "\n- ".join(extra_feedback)
+    response = client.chat.completions.create(
+        model=DEFAULT_MODEL,
+        temperature=0.2,
+        messages=[
+            {"role": "system", "content": build_system_prompt(skill)},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=7000,
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content.strip() if content else ""
 
 
 def generate_daily(target_date: str, focus: str) -> str:
@@ -728,21 +868,18 @@ def generate_daily(target_date: str, focus: str) -> str:
     client = OpenAI(api_key=api_key, base_url=DEFAULT_BASE_URL)
     skill = load_skill()
     print(f"🔍 已抓取候选内容 {len(candidates)} 条，开始调用 DeepSeek 生成日报...", flush=True)
-
-    response = client.chat.completions.create(
-        model=DEFAULT_MODEL,
-        temperature=0.3,
-        messages=[
-            {"role": "system", "content": build_system_prompt(skill)},
-            {"role": "user", "content": build_user_prompt(target_date, focus, candidates)},
-        ],
-        max_tokens=7000,
-    )
-    content = response.choices[0].message.content if response.choices else ""
-    content = content.strip() if content else ""
-    if not content:
-        raise RuntimeError("DeepSeek 返回内容为空")
-    return content
+    feedback: List[str] = []
+    for attempt in range(3):
+        content = request_markdown_from_model(client, skill, target_date, focus, candidates, "\n".join(feedback))
+        if not content:
+            feedback = ["输出为空，必须输出完整 Markdown 日报"]
+            continue
+        errors = validate_generated_markdown(content)
+        if not errors:
+            return content
+        feedback = errors
+        print(f"⚠️ 第 {attempt + 1} 次输出未通过校验，准备重试: {' | '.join(errors[:3])}", flush=True)
+    raise RuntimeError("模型输出未通过真实性/格式校验，已中止生成以避免错误信息入库")
 
 
 def save_output(content: str, output_path: str) -> None:
