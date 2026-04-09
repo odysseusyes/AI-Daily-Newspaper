@@ -62,15 +62,7 @@ jobs:
             REPORT_DATE="$(TZ='Asia/Shanghai' date +%Y-%m-%d)"
           fi
           REPORT_NOW_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          WINDOW_RANGE="$(python - <<PY
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-end_utc = datetime.strptime('${REPORT_NOW_UTC}', '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
-start_local = (end_utc - timedelta(hours=24)).astimezone(ZoneInfo('Asia/Shanghai'))
-end_local = end_utc.astimezone(ZoneInfo('Asia/Shanghai'))
-print(f\"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)\")
-PY
-)"
+          WINDOW_RANGE="$(python -c "from datetime import datetime,timedelta,timezone; from zoneinfo import ZoneInfo; end_utc=datetime.strptime('${REPORT_NOW_UTC}','%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc); start_local=(end_utc-timedelta(hours=24)).astimezone(ZoneInfo('Asia/Shanghai')); end_local=end_utc.astimezone(ZoneInfo('Asia/Shanghai')); print(f'{start_local.strftime(\"%Y-%m-%d %H:%M\")} - {end_local.strftime(\"%Y-%m-%d %H:%M\")} (Asia/Shanghai)')" )"
           echo "DATE=${REPORT_DATE}" >> $GITHUB_OUTPUT
           echo "REPORT_NOW_UTC=${REPORT_NOW_UTC}" >> $GITHUB_OUTPUT
           echo "WINDOW_RANGE=${WINDOW_RANGE}" >> $GITHUB_OUTPUT
