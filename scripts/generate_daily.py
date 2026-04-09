@@ -796,24 +796,134 @@ def dedupe_items(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return result
 
 
-def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> List[Dict[str, str]]:
+def source_bucket_name(source: Dict[str, str]) -> str:
+    fetch_type = source.get("type", "")
+    if fetch_type == "x_jina":
+        return "X"
+    if fetch_type == "youtube_jina":
+        return "YouTube"
+    if fetch_type == "redlib":
+        return "Reddit"
+    if fetch_type == "tiktok_rapidapi":
+        return "TikTok"
+    if fetch_type == "hn":
+        return "Hacker News"
+    return source.get("name", "未知来源")
+
+
+def init_bucket_stats() -> Dict[str, object]:
+    return {
+        "fetched": 0,
+        "passed": 0,
+        "filtered": {
+            "重复去重": 0,
+            "AI 弱相关": 0,
+            "低信息密度": 0,
+            "时间不可核验": 0,
+            "超出 24 小时窗口": 0,
+        },
+    }
+
+
+def top_filter_reasons(bucket: Dict[str, object]) -> str:
+    filtered = bucket.get("filtered", {})
+    if not isinstance(filtered, dict):
+        return "-"
+    ranked = sorted(filtered.items(), key=lambda kv: kv[1], reverse=True)
+    ranked = [(name, count) for name, count in ranked if count]
+    if not ranked:
+        return "-"
+    return "；".join(f"{name} {count}" for name, count in ranked[:2])
+
+
+def render_collection_stats(stats: Dict[str, Dict[str, object]]) -> str:
+    lines = [
+        "## 📊 抓取平台统计",
+        "",
+        "| 来源/平台 | 抓取 | 通过 | 主要过滤原因 |",
+        "|---|---:|---:|---|",
+    ]
+    for name, bucket in stats.items():
+        fetched = int(bucket.get("fetched", 0))
+        passed = int(bucket.get("passed", 0))
+        lines.append(f"| {name} | {fetched} | {passed} | {top_filter_reasons(bucket)} |")
+    return "\n".join(lines)
+
+
+def inject_collection_stats(markdown: str, stats: Dict[str, Dict[str, object]]) -> str:
+    stats_block = render_collection_stats(stats)
+    lines = markdown.splitlines()
+    if not lines:
+        return markdown
+
+    insert_at = None
+    if lines[0].strip() == "---":
+        for idx in range(1, len(lines)):
+            if lines[idx].strip() == "---":
+                for j in range(idx + 1, len(lines)):
+                    if lines[j].strip() == "---":
+                        insert_at = j + 1
+                        break
+                break
+    if insert_at is None:
+        for idx, line in enumerate(lines):
+            if line.startswith("# "):
+                insert_at = idx + 1
+                break
+    if insert_at is None:
+        insert_at = len(lines)
+
+    prefix = lines[:insert_at]
+    suffix = lines[insert_at:]
+    injected = prefix + ["", stats_block, ""] + suffix
+    return "\n".join(injected)
+
+
+def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Tuple[List[Dict[str, str]], Dict[str, Dict[str, object]]]:
     items: List[Dict[str, str]] = []
+    stats: Dict[str, Dict[str, object]] = {}
     window_start_utc, window_end_utc = compute_report_window(report_end_utc)
     for source in config.get("sources", []):
         if source.get("enabled", True) is False:
             continue
-        items.extend(fetch_source(source))
+        bucket_name = source_bucket_name(source)
+        stats.setdefault(bucket_name, init_bucket_stats())
+        source_items = fetch_source(source)
+        stats[bucket_name]["fetched"] = int(stats[bucket_name]["fetched"]) + len(source_items)
+        for item in source_items:
+            item["_bucket_name"] = bucket_name
+        items.extend(source_items)
 
     filtered = []
-    for idx, item in enumerate(dedupe_items(items), start=1):
+    seen = set()
+    deduped_items = []
+    for item in items:
+        bucket_name = item.get("_bucket_name", "未知来源")
+        fingerprint = (item.get("url") or item.get("title") or "").strip().lower()
+        if not fingerprint:
+            continue
+        if fingerprint in seen:
+            stats.setdefault(bucket_name, init_bucket_stats())
+            stats[bucket_name]["filtered"]["重复去重"] += 1
+            continue
+        seen.add(fingerprint)
+        deduped_items.append(item)
+
+    for idx, item in enumerate(deduped_items, start=1):
+        bucket_name = item.get("_bucket_name", "未知来源")
+        stats.setdefault(bucket_name, init_bucket_stats())
         text = f"{item.get('title', '')} {item.get('summary', '')}"
         if not is_ai_related(text):
+            stats[bucket_name]["filtered"]["AI 弱相关"] += 1
             continue
         if is_low_value(text):
+            stats[bucket_name]["filtered"]["低信息密度"] += 1
             continue
         if not item.get("published_verified", False):
+            stats[bucket_name]["filtered"]["时间不可核验"] += 1
             continue
         if not is_within_window(item.get("published_at", ""), window_start_utc, window_end_utc):
+            stats[bucket_name]["filtered"]["超出 24 小时窗口"] += 1
             continue
         item["score"] = score_item(item, focus)
         item["date_label"] = display_date_for_item(item)
@@ -821,8 +931,10 @@ def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Li
         item["is_signal_source"] = is_signal_platform(item.get("platform", ""))
         item["candidate_id"] = f"C{idx:03d}"
         filtered.append(item)
+        stats[bucket_name]["passed"] = int(stats[bucket_name]["passed"]) + 1
     filtered.sort(key=lambda x: x.get("score", 0), reverse=True)
-    return filtered[: config.get("max_candidates", 60)]
+    ordered_stats = dict(sorted(stats.items(), key=lambda kv: (-int(kv[1].get("passed", 0)), -int(kv[1].get("fetched", 0)), kv[0])))
+    return filtered[: config.get("max_candidates", 60)], ordered_stats
 
 
 def summarize_platform_counts(candidates: List[Dict[str, str]]) -> str:
@@ -1040,7 +1152,7 @@ def generate_daily(target_date: str, focus: str) -> str:
 
     config = load_json(CONFIG_PATH)
     report_end_utc = resolve_report_end_utc()
-    candidates = collect_candidates(report_end_utc, focus, config)
+    candidates, collection_stats = collect_candidates(report_end_utc, focus, config)
     if not candidates:
         raise RuntimeError("未抓取到最近24小时窗口内且日期可核验的可用候选内容")
 
@@ -1055,6 +1167,7 @@ def generate_daily(target_date: str, focus: str) -> str:
             feedback = ["输出为空，必须输出完整 Markdown 日报"]
             continue
         content = normalize_deep_report_metadata(content, candidates)
+        content = inject_collection_stats(content, collection_stats)
         errors = validate_generated_markdown(content, candidates)
         if not errors:
             return content
