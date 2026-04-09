@@ -1,6 +1,13 @@
 {
-  "max_candidates": 80,
+  "max_candidates": 140,
   "sources": [
+    {
+      "name": "NYTimes Technology",
+      "platform": "media",
+      "type": "rss",
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+      "limit": 5
+    },
     {
       "name": "TechCrunch AI",
       "platform": "media",
@@ -35,6 +42,20 @@
       "type": "markdown_index",
       "url": "https://openai.com/news/",
       "limit": 5
+    },
+    {
+      "name": "Google Developers Blog",
+      "platform": "official",
+      "type": "html_index",
+      "url": "https://developers.googleblog.com/",
+      "limit": 6
+    },
+    {
+      "name": "Google Cloud Blog",
+      "platform": "official",
+      "type": "html_index",
+      "url": "https://cloud.google.com/blog/products/ai-machine-learning",
+      "limit": 6
     },
     {
       "name": "Anthropic News",
@@ -122,6 +143,13 @@
       "limit": 4
     },
     {
+      "name": "OpenAI Reddit",
+      "platform": "reddit",
+      "type": "redlib",
+      "url": "https://redlib.perennialte.ch/r/OpenAI",
+      "limit": 4
+    },
+    {
       "name": "OpenAI X",
       "platform": "x",
       "type": "x_jina",
@@ -157,10 +185,31 @@
       "limit": 2
     },
     {
+      "name": "Elon Musk X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/elonmusk",
+      "limit": 2
+    },
+    {
       "name": "Jim Fan X",
       "platform": "x",
       "type": "x_jina",
       "url": "https://x.com/DrJimFan",
+      "limit": 2
+    },
+    {
+      "name": "Yann LeCun X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/ylecun",
+      "limit": 2
+    },
+    {
+      "name": "Lex Fridman X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/lexfridman",
       "limit": 2
     },
     {
@@ -171,6 +220,13 @@
       "limit": 2
     },
     {
+      "name": "Ilya Sutskever X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/ilyasut",
+      "limit": 2
+    },
+    {
       "name": "Claude X",
       "platform": "x",
       "type": "x_jina",
@@ -178,10 +234,24 @@
       "limit": 2
     },
     {
+      "name": "Midjourney X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/midjourney",
+      "limit": 2
+    },
+    {
       "name": "Meta AI X",
       "platform": "x",
       "type": "x_jina",
       "url": "https://x.com/AIatMeta",
+      "limit": 2
+    },
+    {
+      "name": "Runway X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/runwayml",
       "limit": 2
     },
     {
@@ -203,6 +273,13 @@
       "platform": "youtube",
       "type": "youtube_jina",
       "url": "https://www.youtube.com/@OpenAI/videos",
+      "limit": 3
+    },
+    {
+      "name": "Claude YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@claude/videos",
       "limit": 3
     },
     {
@@ -232,6 +309,13 @@
       "type": "youtube_jina",
       "url": "https://www.youtube.com/@YannicKilcher/videos",
       "limit": 3
+    },
+    {
+      "name": "Product Hunt AI",
+      "platform": "community",
+      "type": "markdown_index",
+      "url": "https://www.producthunt.com/topics/artificial-intelligence",
+      "limit": 4
     },
     {
       "name": "TikTok AI Search",

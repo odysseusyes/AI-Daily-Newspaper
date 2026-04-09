@@ -132,10 +132,13 @@ cp -r skills/ai-daily ~/.claude/skills/
 ## 🔑 数据源覆盖
 
 **媒体 / 官方 / 研究**
+- NYTimes Technology
 - TechCrunch AI
 - The Verge AI
 - VentureBeat AI
 - MIT Technology Review AI
+- Google Developers Blog
+- Google Cloud Blog
 - OpenAI News
 - Anthropic News
 - Google DeepMind Blog
@@ -148,9 +151,10 @@ cp -r skills/ai-daily ~/.claude/skills/
 - Reddit（通过 Redlib 镜像）
 - X（通过 `r.jina.ai` 代理）
 - YouTube（通过 `r.jina.ai` 代理）
+- Product Hunt AI
 - TikTok（可选，需 RapidAPI Key）
 
-> 当前实现已经接入 X / Reddit / YouTube。TikTok 需要额外 Secret 才会返回内容。
+> 当前实现已经接入 X / Reddit / YouTube / Product Hunt。TikTok 需要额外 Secret 才会返回内容。
 
 ---
 
