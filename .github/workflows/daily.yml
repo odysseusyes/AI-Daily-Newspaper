@@ -22,6 +22,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ai-daily-main
+  cancel-in-progress: false
+
 jobs:
   generate-daily:
     name: 生成 AI 日报
@@ -31,6 +35,13 @@ jobs:
     steps:
       - name: 📥 Checkout 仓库
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 🔄 同步最新 main
+        run: |
+          git fetch origin main
+          git pull --ff-only origin main
 
       - name: 🐍 配置 Python 环境
         uses: actions/setup-python@v6
