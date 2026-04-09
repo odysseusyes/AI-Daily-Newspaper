@@ -128,6 +128,16 @@ def has_verified_recent_date(published_at: str, max_age_days: int = 7) -> bool:
     return now - dt <= timedelta(days=max_age_days)
 
 
+def is_on_target_date(published_at: str, target_date: str) -> bool:
+    dt = parse_datetime_safe(published_at)
+    if not dt:
+        return False
+    try:
+        return dt.astimezone().strftime("%Y-%m-%d") == target_date
+    except Exception:
+        return False
+
+
 def is_primary_source_platform(platform: str) -> bool:
     return platform in PRIMARY_PLATFORMS
 
@@ -713,7 +723,7 @@ def dedupe_items(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return result
 
 
-def collect_candidates(focus: str, config: Dict) -> List[Dict[str, str]]:
+def collect_candidates(target_date: str, focus: str, config: Dict) -> List[Dict[str, str]]:
     items: List[Dict[str, str]] = []
     for source in config.get("sources", []):
         if source.get("enabled", True) is False:
@@ -726,6 +736,10 @@ def collect_candidates(focus: str, config: Dict) -> List[Dict[str, str]]:
         if not is_ai_related(text):
             continue
         if is_low_value(text):
+            continue
+        if not item.get("published_verified", False):
+            continue
+        if not is_on_target_date(item.get("published_at", ""), target_date):
             continue
         item["score"] = score_item(item, focus)
         item["date_label"] = display_date_for_item(item)
@@ -744,7 +758,7 @@ def summarize_platform_counts(candidates: List[Dict[str, str]]) -> str:
     return json.dumps(counts, ensure_ascii=False)
 
 
-def build_system_prompt(skill_content: str) -> str:
+def build_system_prompt(skill_content: str, target_date: str) -> str:
     return f"""你是一位专业 AI 资讯编辑。你只能基于我提供的候选素材写日报，不能虚构新事实。
 
 以下是技能定义，请严格遵守其筛选和排版要求：
@@ -758,8 +772,9 @@ def build_system_prompt(skill_content: str) -> str:
 4. 每条深度报道必须包含：深度摘要、关键判断、对我的帮助。
 5. 每条深度报道标题必须使用 Markdown 超链接：### [中文标题](原文链接)
 6. 任何“发布/推出/上线/开源/宣布”类重大事实，必须来自 primary source 候选（official/media/research）且 `published_verified=true`。
-7. X / YouTube / Reddit / Hacker News 只能进入“观点 / 社区信号”或“快讯”，不能作为模型发布事实的一手依据。
-8. 如果候选没有可核验日期，必须写“时间待核实”，不能擅自写具体日期。
+7. 只允许使用 `date_label={target_date}` 的候选；不是目标日期的内容一律丢弃。
+8. X / YouTube / Reddit / Hacker News 只能进入“观点 / 社区信号”或“快讯”，不能作为模型发布事实的一手依据。
+9. 如果候选没有可核验日期，必须直接弃用，不能写入日报。
 """
 
 
@@ -783,6 +798,7 @@ def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, s
 - 所有深度报道标题必须写成 `[标题](url)`，不得写“（含超链接）”占位词
 - 任何重大发布类表述都必须能在候选的 `published_verified=true` 且 `is_primary_source=true` 中找到依据
 - `is_signal_source=true` 的候选不要放进“深度报道”
+- 只允许使用 `date_label={target_date}` 的候选；昨天及更早的内容一律不要
 
 候选素材如下：
 {payload}
@@ -846,7 +862,7 @@ def request_markdown_from_model(client: OpenAI, skill: str, target_date: str, fo
         model=DEFAULT_MODEL,
         temperature=0.2,
         messages=[
-            {"role": "system", "content": build_system_prompt(skill)},
+            {"role": "system", "content": build_system_prompt(skill, target_date)},
             {"role": "user", "content": user_prompt},
         ],
         max_tokens=7000,
@@ -861,9 +877,9 @@ def generate_daily(target_date: str, focus: str) -> str:
         raise RuntimeError("缺少环境变量 DEEPSEEK_API_KEY")
 
     config = load_json(CONFIG_PATH)
-    candidates = collect_candidates(focus, config)
+    candidates = collect_candidates(target_date, focus, config)
     if not candidates:
-        raise RuntimeError("未抓取到可用候选内容，请检查网络或数据源")
+        raise RuntimeError(f"未抓取到 {target_date} 当天且日期可核验的可用候选内容")
 
     client = OpenAI(api_key=api_key, base_url=DEFAULT_BASE_URL)
     skill = load_skill()
