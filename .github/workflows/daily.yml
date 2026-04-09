@@ -1,0 +1,108 @@
+name: 🤖 AI Daily Digest
+
+on:
+  schedule:
+    # 每天 UTC 00:00 = 北京时间 08:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: '指定日期 (YYYY-MM-DD)，留空为今天'
+        required: false
+        default: ''
+      focus:
+        description: '聚焦方向 (ecommerce/research/tools)，留空为全部'
+        required: false
+        default: ''
+      preview_only:
+        description: '仅预览不写入 Obsidian (true/false)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-daily:
+    name: 生成 AI 日报
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout 仓库
+        uses: actions/checkout@v6
+
+      - name: 🐍 配置 Python 环境
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 📦 安装依赖
+        run: |
+          pip install -r requirements.txt --quiet
+
+      - name: 🗓️ 设置日期变量
+        id: date
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            echo "DATE=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
+          else
+            echo "DATE=$(TZ='Asia/Shanghai' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          fi
+          echo "DATETIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
+
+      - name: 🔍 抓取并生成日报
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: deepseek-chat
+          TARGET_DATE: ${{ steps.date.outputs.DATE }}
+          FOCUS: ${{ github.event.inputs.focus }}
+          TIKTOK_RAPIDAPI_KEY: ${{ secrets.TIKTOK_RAPIDAPI_KEY }}
+          TIKTOK_RAPIDAPI_HOST: ${{ secrets.TIKTOK_RAPIDAPI_HOST }}
+        run: |
+          python scripts/generate_daily.py \
+            --date "$TARGET_DATE" \
+            --focus "$FOCUS" \
+            --output "reports/AI日报_$TARGET_DATE.md"
+
+      - name: 📝 提交日报到仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports
+          if git diff --cached --quiet; then
+            echo "No report changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: daily AI report (${{ steps.date.outputs.DATE }})"
+          git push
+
+      - name: 📤 推送到 Obsidian (via Git Sync)
+        if: ${{ github.event.inputs.preview_only != 'true' }}
+        env:
+          OBSIDIAN_VAULT_REPO: ${{ secrets.OBSIDIAN_VAULT_REPO }}
+          OBSIDIAN_TOKEN: ${{ secrets.OBSIDIAN_TOKEN }}
+          TARGET_DATE: ${{ steps.date.outputs.DATE }}
+        run: |
+          python scripts/push_to_obsidian.py \
+            --file "reports/AI日报_$TARGET_DATE.md" \
+            --vault-folder "AI日报"
+
+      - name: 💾 上传产物（备份）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-daily-${{ steps.date.outputs.DATE }}
+          path: reports/AI日报_*.md
+          retention-days: 30
+
+      - name: ✅ 输出摘要
+        run: |
+          echo "## 📰 AI日报生成完成" >> $GITHUB_STEP_SUMMARY
+          echo "- **日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **生成时间：** ${{ steps.date.outputs.DATETIME }} (北京时间)" >> $GITHUB_STEP_SUMMARY
+          echo "- **文件：** AI日报_${{ steps.date.outputs.DATE }}.md" >> $GITHUB_STEP_SUMMARY
+          if [ -f "reports/AI日报_${{ steps.date.outputs.DATE }}.md" ]; then
+            LINES=$(wc -l < "reports/AI日报_${{ steps.date.outputs.DATE }}.md")
+            echo "- **行数：** $LINES 行" >> $GITHUB_STEP_SUMMARY
+          fi

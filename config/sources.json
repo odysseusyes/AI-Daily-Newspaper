@@ -1,0 +1,248 @@
+{
+  "max_candidates": 80,
+  "sources": [
+    {
+      "name": "TechCrunch AI",
+      "platform": "media",
+      "type": "rss",
+      "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+      "limit": 6
+    },
+    {
+      "name": "The Verge AI",
+      "platform": "media",
+      "type": "markdown_index",
+      "url": "https://www.theverge.com/ai-artificial-intelligence",
+      "limit": 5
+    },
+    {
+      "name": "VentureBeat AI",
+      "platform": "media",
+      "type": "html_index",
+      "url": "https://venturebeat.com/ai/",
+      "limit": 5
+    },
+    {
+      "name": "MIT Technology Review AI",
+      "platform": "media",
+      "type": "html_index",
+      "url": "https://www.technologyreview.com/topic/artificial-intelligence/",
+      "limit": 5
+    },
+    {
+      "name": "OpenAI News",
+      "platform": "official",
+      "type": "markdown_index",
+      "url": "https://openai.com/news/",
+      "limit": 5
+    },
+    {
+      "name": "Anthropic News",
+      "platform": "official",
+      "type": "html_index",
+      "url": "https://www.anthropic.com/news",
+      "limit": 5
+    },
+    {
+      "name": "Google DeepMind Blog",
+      "platform": "official",
+      "type": "html_index",
+      "url": "https://deepmind.google/discover/blog/",
+      "limit": 5
+    },
+    {
+      "name": "Meta AI Blog",
+      "platform": "official",
+      "type": "html_index",
+      "url": "https://ai.meta.com/blog/",
+      "limit": 5
+    },
+    {
+      "name": "Hugging Face Papers",
+      "platform": "research",
+      "type": "html_index",
+      "url": "https://huggingface.co/papers",
+      "limit": 8
+    },
+    {
+      "name": "arXiv cs.AI",
+      "platform": "research",
+      "type": "atom",
+      "url": "http://export.arxiv.org/api/query?search_query=cat:cs.AI&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
+      "limit": 5
+    },
+    {
+      "name": "arXiv cs.CL",
+      "platform": "research",
+      "type": "atom",
+      "url": "http://export.arxiv.org/api/query?search_query=cat:cs.CL&start=0&max_results=4&sortBy=submittedDate&sortOrder=descending",
+      "limit": 4
+    },
+    {
+      "name": "arXiv cs.LG",
+      "platform": "research",
+      "type": "atom",
+      "url": "http://export.arxiv.org/api/query?search_query=cat:cs.LG&start=0&max_results=4&sortBy=submittedDate&sortOrder=descending",
+      "limit": 4
+    },
+    {
+      "name": "Hacker News Top",
+      "platform": "community",
+      "type": "hn",
+      "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+      "limit": 8,
+      "scan_limit": 40
+    },
+    {
+      "name": "MachineLearning Reddit",
+      "platform": "reddit",
+      "type": "redlib",
+      "url": "https://redlib.perennialte.ch/r/MachineLearning",
+      "limit": 4
+    },
+    {
+      "name": "LocalLLaMA Reddit",
+      "platform": "reddit",
+      "type": "redlib",
+      "url": "https://redlib.perennialte.ch/r/LocalLLaMA",
+      "limit": 4
+    },
+    {
+      "name": "Singularity Reddit",
+      "platform": "reddit",
+      "type": "redlib",
+      "url": "https://redlib.perennialte.ch/r/singularity",
+      "limit": 4
+    },
+    {
+      "name": "Artificial Reddit",
+      "platform": "reddit",
+      "type": "redlib",
+      "url": "https://redlib.perennialte.ch/r/artificial",
+      "limit": 4
+    },
+    {
+      "name": "OpenAI X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/OpenAI",
+      "limit": 3
+    },
+    {
+      "name": "Sam Altman X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/sama",
+      "limit": 3
+    },
+    {
+      "name": "Demis Hassabis X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/demishassabis",
+      "limit": 2
+    },
+    {
+      "name": "Andrej Karpathy X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/karpathy",
+      "limit": 2
+    },
+    {
+      "name": "Andrew Ng X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/AndrewYNg",
+      "limit": 2
+    },
+    {
+      "name": "Jim Fan X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/DrJimFan",
+      "limit": 2
+    },
+    {
+      "name": "Google DeepMind X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/GoogleDeepMind",
+      "limit": 2
+    },
+    {
+      "name": "Claude X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/claudeai",
+      "limit": 2
+    },
+    {
+      "name": "Meta AI X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/AIatMeta",
+      "limit": 2
+    },
+    {
+      "name": "DeepSeek X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/deepseek_ai",
+      "limit": 2
+    },
+    {
+      "name": "Qwen X",
+      "platform": "x",
+      "type": "x_jina",
+      "url": "https://x.com/Alibaba_Qwen",
+      "limit": 2
+    },
+    {
+      "name": "OpenAI YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@OpenAI/videos",
+      "limit": 3
+    },
+    {
+      "name": "Google DeepMind YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@GoogleDeepMind/videos",
+      "limit": 2
+    },
+    {
+      "name": "Fireship YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@Fireship/videos",
+      "limit": 3
+    },
+    {
+      "name": "Two Minute Papers YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@TwoMinutePapers/videos",
+      "limit": 3
+    },
+    {
+      "name": "Yannic Kilcher YouTube",
+      "platform": "youtube",
+      "type": "youtube_jina",
+      "url": "https://www.youtube.com/@YannicKilcher/videos",
+      "limit": 3
+    },
+    {
+      "name": "TikTok AI Search",
+      "platform": "tiktok",
+      "type": "tiktok_rapidapi",
+      "url": "https://tiktok-api23.p.rapidapi.com/api/search/video",
+      "keywords": ["ai", "openai", "deepseek", "qwen", "claude", "gemini"],
+      "max_keywords": 3,
+      "per_keyword": 2,
+      "limit": 5,
+      "enabled": true
+    }
+  ]
+}
