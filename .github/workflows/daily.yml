@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: '指定日期 (YYYY-MM-DD)，留空为今天'
+        description: '指定日报版次日期 (YYYY-MM-DD)，留空为昨天'
         required: false
         default: ''
       focus:
@@ -57,10 +57,17 @@ jobs:
         id: date
         run: |
           if [ -n "${{ github.event.inputs.date }}" ]; then
-            echo "DATE=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
+            REPORT_DATE="${{ github.event.inputs.date }}"
           else
-            echo "DATE=$(TZ='Asia/Shanghai' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+            REPORT_DATE="$(TZ='Asia/Shanghai' date -v-1d +%Y-%m-%d 2>/dev/null || TZ='Asia/Shanghai' date -d 'yesterday' +%Y-%m-%d)"
           fi
+          NEXT_DATE="$(python - <<PY
+from datetime import datetime, timedelta
+print((datetime.strptime('${REPORT_DATE}', '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d'))
+PY
+)"
+          echo "DATE=${REPORT_DATE}" >> $GITHUB_OUTPUT
+          echo "NEXT_DATE=${NEXT_DATE}" >> $GITHUB_OUTPUT
           echo "DATETIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
 
       - name: 🔍 抓取并生成日报
@@ -99,7 +106,8 @@ jobs:
       - name: ✅ 输出摘要
         run: |
           echo "## 📰 AI日报生成完成" >> $GITHUB_STEP_SUMMARY
-          echo "- **日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **版次日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **时间窗口：** ${{ steps.date.outputs.DATE }} 08:00 - ${{ steps.date.outputs.NEXT_DATE }} 08:00 (Asia/Shanghai)" >> $GITHUB_STEP_SUMMARY
           echo "- **生成时间：** ${{ steps.date.outputs.DATETIME }} (北京时间)" >> $GITHUB_STEP_SUMMARY
           echo "- **文件：** AI日报_${{ steps.date.outputs.DATE }}.md" >> $GITHUB_STEP_SUMMARY
           echo "- **发布位置：** 仓库 reports/ 目录" >> $GITHUB_STEP_SUMMARY

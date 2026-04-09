@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 from urllib.parse import urljoin, urlparse
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
@@ -32,6 +33,7 @@ REQUEST_TIMEOUT = 25
 DEFAULT_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 DEFAULT_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 JINA_PREFIX = "https://r.jina.ai/http://"
+SH_TZ = ZoneInfo("Asia/Shanghai")
 
 AI_KEYWORDS = [
     "ai",
@@ -120,21 +122,11 @@ def parse_datetime_safe(value: str):
     return None
 
 
-def has_verified_recent_date(published_at: str, max_age_days: int = 7) -> bool:
+def is_within_window(published_at: str, window_start_utc: datetime, window_end_utc: datetime) -> bool:
     dt = parse_datetime_safe(published_at)
     if not dt:
         return False
-    now = datetime.now(timezone.utc)
-    return now - dt <= timedelta(days=max_age_days)
-
-
-def is_within_last_hours(published_at: str, hours: int = 24) -> bool:
-    dt = parse_datetime_safe(published_at)
-    if not dt:
-        return False
-    now = datetime.now(timezone.utc)
-    delta = now - dt
-    return timedelta(0) <= delta <= timedelta(hours=hours)
+    return window_start_utc <= dt < window_end_utc
 
 
 def is_primary_source_platform(platform: str) -> bool:
@@ -154,7 +146,29 @@ def display_date_for_item(item: Dict[str, str]) -> str:
     dt = parse_datetime_safe(item.get("published_at", ""))
     if not dt:
         return "时间待核实"
-    return dt.astimezone().strftime("%Y-%m-%d")
+    return dt.astimezone(SH_TZ).strftime("%Y-%m-%d")
+
+
+def parse_report_date(report_date: str) -> datetime:
+    return datetime.strptime(report_date, "%Y-%m-%d").replace(tzinfo=SH_TZ)
+
+
+def default_report_date() -> str:
+    return (datetime.now(SH_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def compute_report_window(report_date: str) -> Tuple[datetime, datetime]:
+    edition_day = parse_report_date(report_date)
+    window_start = edition_day.replace(hour=8, minute=0, second=0, microsecond=0)
+    window_end = window_start + timedelta(days=1)
+    return window_start.astimezone(timezone.utc), window_end.astimezone(timezone.utc)
+
+
+def format_report_window(report_date: str) -> str:
+    window_start_utc, window_end_utc = compute_report_window(report_date)
+    start_local = window_start_utc.astimezone(SH_TZ)
+    end_local = window_end_utc.astimezone(SH_TZ)
+    return f"{start_local.strftime('%Y-%m-%d %H:%M')} - {end_local.strftime('%Y-%m-%d %H:%M')} (Asia/Shanghai)"
 
 
 def as_jina_url(url: str) -> str:
@@ -722,8 +736,9 @@ def dedupe_items(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
     return result
 
 
-def collect_candidates(focus: str, config: Dict) -> List[Dict[str, str]]:
+def collect_candidates(report_date: str, focus: str, config: Dict) -> List[Dict[str, str]]:
     items: List[Dict[str, str]] = []
+    window_start_utc, window_end_utc = compute_report_window(report_date)
     for source in config.get("sources", []):
         if source.get("enabled", True) is False:
             continue
@@ -738,7 +753,7 @@ def collect_candidates(focus: str, config: Dict) -> List[Dict[str, str]]:
             continue
         if not item.get("published_verified", False):
             continue
-        if not is_within_last_hours(item.get("published_at", ""), 24):
+        if not is_within_window(item.get("published_at", ""), window_start_utc, window_end_utc):
             continue
         item["score"] = score_item(item, focus)
         item["date_label"] = display_date_for_item(item)
@@ -757,7 +772,7 @@ def summarize_platform_counts(candidates: List[Dict[str, str]]) -> str:
     return json.dumps(counts, ensure_ascii=False)
 
 
-def build_system_prompt(skill_content: str, target_date: str) -> str:
+def build_system_prompt(skill_content: str, target_date: str, report_window: str) -> str:
     return f"""你是一位专业 AI 资讯编辑。你只能基于我提供的候选素材写日报，不能虚构新事实。
 
 以下是技能定义，请严格遵守其筛选和排版要求：
@@ -771,19 +786,20 @@ def build_system_prompt(skill_content: str, target_date: str) -> str:
 4. 每条深度报道必须包含：深度摘要、关键判断、对我的帮助。
 5. 每条深度报道标题必须使用 Markdown 超链接：### [中文标题](原文链接)
 6. 任何“发布/推出/上线/开源/宣布”类重大事实，必须来自 primary source 候选（official/media/research）且 `published_verified=true`。
-7. 只允许使用“过去 24 小时内且日期可核验”的候选；超出 24 小时窗口的内容一律丢弃。
+7. 只允许使用报告窗口内且日期可核验的候选；超出窗口的内容一律丢弃。
 8. X / YouTube / Reddit / Hacker News 只能进入“观点 / 社区信号”或“快讯”，不能作为模型发布事实的一手依据。
 9. 如果候选没有可核验日期，必须直接弃用，不能写入日报。
+10. 本次报告窗口固定为：{report_window}。不要使用窗口外内容。
 """
 
 
-def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, str]]) -> str:
+def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, str]], report_window: str) -> str:
     focus_instruction = FOCUS_PROMPTS.get(focus, FOCUS_PROMPTS[""])
     payload = json.dumps(candidates, ensure_ascii=False, indent=2)
     platform_stats = summarize_platform_counts(candidates)
     return f"""请基于以下候选素材，生成 {target_date} 的 AI 每日日报。
 
-时间范围：以 {target_date} 为主的最近 24 小时公开信息。
+时间范围：{report_window}
 聚焦方向：{focus_instruction}
 当前候选平台分布：{platform_stats}
 
@@ -797,7 +813,7 @@ def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, s
 - 所有深度报道标题必须写成 `[标题](url)`，不得写“（含超链接）”占位词
 - 任何重大发布类表述都必须能在候选的 `published_verified=true` 且 `is_primary_source=true` 中找到依据
 - `is_signal_source=true` 的候选不要放进“深度报道”
-- 只允许使用“过去 24 小时内且日期可核验”的候选；超出 24 小时窗口的内容一律不要
+- 只允许使用上述固定窗口内且日期可核验的候选；超出窗口的内容一律不要
 
 候选素材如下：
 {payload}
@@ -805,31 +821,51 @@ def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, s
 直接输出最终 Markdown，不要添加额外说明。"""
 
 
-def validate_generated_markdown(markdown: str) -> List[str]:
+def validate_generated_markdown(markdown: str, candidates: List[Dict[str, str]]) -> List[str]:
     errors: List[str] = []
     lines = markdown.splitlines()
     in_deep_section = False
     current_title = ""
     current_source_line = ""
     current_date_line = ""
+    current_url = ""
+    candidate_map = {item.get("url", ""): item for item in candidates if item.get("url")}
+    linked_urls = set(re.findall(r"\[[^\]]+\]\((https?://[^)]+)\)", markdown))
 
     def flush_current():
-        nonlocal current_title, current_source_line, current_date_line
+        nonlocal current_title, current_source_line, current_date_line, current_url
         if not current_title:
             return
-        if not re.match(r"^### \[.+\]\(https?://.+\)$", current_title.strip()):
+        match = re.match(r"^### \[(.+)\]\((https?://.+)\)$", current_title.strip())
+        if not match:
             errors.append(f"深度报道标题不是有效超链接: {current_title}")
+        else:
+            current_url = match.group(2).strip()
         if "（含超链接）" in current_title:
             errors.append(f"标题仍包含占位词“含超链接”: {current_title}")
-        release_text = f"{current_title} {current_source_line}".lower()
-        if contains_release_claim(release_text) and re.search(r"来源：.*(X|YouTube|Reddit|Hacker News)", current_source_line):
-            errors.append(f"发布类内容错误地使用了社媒/社区源: {current_title}")
-        if current_date_line and "📅" in current_date_line:
-            if "时间待核实" not in current_date_line and not re.search(r"\d{4}-\d{2}-\d{2}", current_date_line):
-                errors.append(f"日期格式无效: {current_date_line}")
+        candidate = candidate_map.get(current_url)
+        if not candidate:
+            errors.append(f"深度报道使用了候选列表之外的链接: {current_url or current_title}")
+        else:
+            release_text = f"{current_title} {current_source_line}".lower()
+            if contains_release_claim(release_text) and not candidate.get("is_primary_source", False):
+                errors.append(f"发布类内容未使用可核验的一手源: {current_title}")
+            expected_source = candidate.get("source", "")
+            expected_date = candidate.get("date_label", "")
+            if expected_source and expected_source not in current_source_line:
+                errors.append(f"来源名称与候选不一致: {current_title}")
+            if expected_date and expected_date != "时间待核实" and expected_date not in current_date_line:
+                errors.append(f"日期与候选不一致: {current_title}")
+        if current_date_line and "📅" in current_date_line and "时间待核实" not in current_date_line and not re.search(r"\d{4}-\d{2}-\d{2}", current_date_line):
+            errors.append(f"日期格式无效: {current_date_line}")
         current_title = ""
         current_source_line = ""
         current_date_line = ""
+        current_url = ""
+
+    for url in linked_urls:
+        if url not in candidate_map:
+            errors.append(f"正文包含候选列表之外的链接: {url}")
 
     for line in lines:
         stripped = line.strip()
@@ -853,15 +889,15 @@ def validate_generated_markdown(markdown: str) -> List[str]:
     return errors
 
 
-def request_markdown_from_model(client: OpenAI, skill: str, target_date: str, focus: str, candidates: List[Dict[str, str]], extra_feedback: str = "") -> str:
-    user_prompt = build_user_prompt(target_date, focus, candidates)
+def request_markdown_from_model(client: OpenAI, skill: str, target_date: str, focus: str, candidates: List[Dict[str, str]], report_window: str, extra_feedback: str = "") -> str:
+    user_prompt = build_user_prompt(target_date, focus, candidates, report_window)
     if extra_feedback:
         user_prompt += f"\n\n上一次输出存在这些错误，必须全部修正后再输出：\n- " + "\n- ".join(extra_feedback)
     response = client.chat.completions.create(
         model=DEFAULT_MODEL,
         temperature=0.2,
         messages=[
-            {"role": "system", "content": build_system_prompt(skill, target_date)},
+            {"role": "system", "content": build_system_prompt(skill, target_date, report_window)},
             {"role": "user", "content": user_prompt},
         ],
         max_tokens=7000,
@@ -876,20 +912,21 @@ def generate_daily(target_date: str, focus: str) -> str:
         raise RuntimeError("缺少环境变量 DEEPSEEK_API_KEY")
 
     config = load_json(CONFIG_PATH)
-    candidates = collect_candidates(focus, config)
+    candidates = collect_candidates(target_date, focus, config)
     if not candidates:
-        raise RuntimeError("未抓取到过去24小时内且日期可核验的可用候选内容")
+        raise RuntimeError("未抓取到报告窗口内且日期可核验的可用候选内容")
 
     client = OpenAI(api_key=api_key, base_url=DEFAULT_BASE_URL)
     skill = load_skill()
+    report_window = format_report_window(target_date)
     print(f"🔍 已抓取候选内容 {len(candidates)} 条，开始调用 DeepSeek 生成日报...", flush=True)
     feedback: List[str] = []
     for attempt in range(3):
-        content = request_markdown_from_model(client, skill, target_date, focus, candidates, "\n".join(feedback))
+        content = request_markdown_from_model(client, skill, target_date, focus, candidates, report_window, "\n".join(feedback))
         if not content:
             feedback = ["输出为空，必须输出完整 Markdown 日报"]
             continue
-        errors = validate_generated_markdown(content)
+        errors = validate_generated_markdown(content, candidates)
         if not errors:
             return content
         feedback = errors
@@ -911,7 +948,7 @@ def main() -> None:
     parser.add_argument("--output", default="", help="输出文件路径")
     args = parser.parse_args()
 
-    target_date = args.date or datetime.now().strftime("%Y-%m-%d")
+    target_date = args.date or default_report_date()
     output_path = args.output or f"reports/AI日报_{target_date}.md"
     content = generate_daily(target_date, args.focus)
     save_output(content, output_path)
