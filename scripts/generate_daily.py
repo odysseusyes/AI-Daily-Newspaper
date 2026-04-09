@@ -138,6 +138,50 @@ def parse_datetime_safe(value: str):
     return None
 
 
+def parse_date_from_text(text: str):
+    text = clean_text(text)
+    if not text:
+        return None
+    month_pattern = (
+        r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+        r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+    )
+    patterns = (
+        rf"{month_pattern}\s+\d{{1,2}},\s+\d{{4}}",
+        rf"{month_pattern}\s+\d{{1,2}}\s+\d{{4}}",
+        r"\d{4}-\d{2}-\d{2}",
+        r"\d{4}/\d{2}/\d{2}",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        matched = match.group(0).strip().replace("/", "-")
+        dt = parse_datetime_safe(matched)
+        if dt:
+            return dt
+        for fmt in ("%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(matched, fmt).replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+    return None
+
+
+def parse_date_from_url(url: str):
+    path = urlparse(url).path
+    for pattern in (r"/(20\d{2})/(0[1-9]|1[0-2])/([0-3]\d)/", r"(20\d{2})-(0[1-9]|1[0-2])-([0-3]\d)"):
+        match = re.search(pattern, path)
+        if not match:
+            continue
+        try:
+            year, month, day = match.groups()
+            return datetime(int(year), int(month), int(day), tzinfo=timezone.utc)
+        except Exception:
+            continue
+    return None
+
+
 def is_within_window(published_at: str, report_end_utc: datetime, window_hours: int) -> bool:
     dt = parse_datetime_safe(published_at)
     if not dt:
@@ -331,6 +375,10 @@ def extract_article_snapshot(url: str, source_name: str, platform: str) -> Dict[
     for attr in [
         ("meta", {"property": "article:published_time"}),
         ("meta", {"name": "article:published_time"}),
+        ("meta", {"property": "og:published_time"}),
+        ("meta", {"name": "publish-date"}),
+        ("meta", {"name": "date"}),
+        ("meta", {"itemprop": "datePublished"}),
         ("time", {}),
     ]:
         node = soup.find(attr[0], attrs=attr[1])
@@ -345,6 +393,34 @@ def extract_article_snapshot(url: str, source_name: str, platform: str) -> Dict[
         published = clean_text(node.get_text(" ", strip=True))
         if published:
             break
+
+    if not published:
+        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = script.string or script.get_text(" ", strip=True)
+            if not raw:
+                continue
+            try:
+                payload = json.loads(raw)
+            except Exception:
+                continue
+            objects = payload if isinstance(payload, list) else [payload]
+            for obj in objects:
+                if not isinstance(obj, dict):
+                    continue
+                for key in ("datePublished", "dateCreated", "uploadDate"):
+                    value = clean_text(str(obj.get(key, "")))
+                    if value:
+                        published = value
+                        break
+                if published:
+                    break
+            if published:
+                break
+
+    if not published:
+        inferred = parse_date_from_text(soup.get_text(" ", strip=True)[:3000]) or parse_date_from_url(url)
+        if inferred:
+            published = inferred.isoformat()
 
     if not title:
         return {}
@@ -647,15 +723,42 @@ def fetch_x_api_items(source: Dict[str, str]) -> List[Dict[str, str]]:
         text = clean_text(tweet.get("text", ""))
         if len(text) < 20:
             continue
+        tweet_id = clean_text(
+            str(
+                tweet.get("id")
+                or tweet.get("tweetId")
+                or tweet.get("tweet_id")
+                or tweet.get("rest_id")
+                or ""
+            )
+        )
+        created_at = clean_text(
+            str(
+                tweet.get("createdAt")
+                or tweet.get("created_at")
+                or tweet.get("created")
+                or ""
+            )
+        )[:80]
+        tweet_url = clean_text(
+            str(
+                tweet.get("url")
+                or tweet.get("twitterUrl")
+                or tweet.get("tweetUrl")
+                or ""
+            )
+        )
+        if not tweet_url and tweet_id:
+            tweet_url = f"https://x.com/{handle}/status/{tweet_id}"
         items.append(
             {
                 "title": text.split(".")[0][:120],
                 "summary": text[:500],
-                "url": clean_text(tweet.get("url", "")),
+                "url": tweet_url,
                 "source": source["name"],
                 "platform": source["platform"],
-                "published_at": clean_text(tweet.get("createdAt", ""))[:80],
-                "published_verified": bool(parse_datetime_safe(clean_text(tweet.get("createdAt", ""))[:80])),
+                "published_at": created_at,
+                "published_verified": bool(parse_datetime_safe(created_at)),
             }
         )
         if len(items) >= source.get("limit", 3):
@@ -1027,7 +1130,8 @@ def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Tu
         bucket_name = item.get("_bucket_name", "未知来源")
         stats.setdefault(bucket_name, init_bucket_stats())
         text = f"{item.get('title', '')} {item.get('summary', '')}"
-        if not is_ai_related(text):
+        needs_keyword_gate = item.get("platform") not in {"x", "youtube", "reddit", "tiktok"}
+        if needs_keyword_gate and not is_ai_related(text):
             stats[bucket_name]["filtered"]["AI 弱相关"] += 1
             continue
         if is_low_value(text):
