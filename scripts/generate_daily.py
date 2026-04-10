@@ -82,7 +82,16 @@ SECTION_TARGETS = {
     "X / Twitter 重点舆情": 15,
     "YouTube 核心内容": 5,
     "TechCrunch 深度文章": 6,
+    "其他平台深度报道": 6,
     "其他平台快讯": 12,
+}
+
+PROMPT_POOL_LIMITS = {
+    "X / Twitter 重点舆情": 20,
+    "YouTube 核心内容": 8,
+    "TechCrunch 深度文章": 8,
+    "其他平台深度报道": 10,
+    "其他平台快讯": 24,
 }
 
 BASE_WINDOW_HOURS = 36
@@ -96,6 +105,20 @@ PLATFORM_WINDOW_HOURS = {
 PRIMARY_PLATFORMS = {"official", "media", "research"}
 SIGNAL_PLATFORMS = {"x", "youtube", "reddit", "community"}
 RELEASE_TERMS = ["发布", "推出", "上线", "开源", "宣布", "launch", "release", "introduc", "debut"]
+
+STRUCTURED_HEADINGS = [
+    "## 🔥 今日重点判断（TOP 5）",
+    "## 🐦 X / Twitter 重点舆情",
+    "## 📺 YouTube 核心内容",
+    "## 📌 TechCrunch 深度文章",
+    "## 📰 其他平台深度报道",
+    "## ⚡ 其他平台快讯",
+]
+
+DEEP_SECTION_HEADINGS = {
+    "## 📌 TechCrunch 深度文章",
+    "## 📰 其他平台深度报道",
+}
 
 
 def load_json(path: Path) -> Dict:
@@ -1024,25 +1047,69 @@ def unique_preserving_order(items: List[str]) -> List[str]:
     return result
 
 
+def infer_section_name(item: Dict[str, str]) -> str:
+    platform = item.get("platform", "")
+    source = item.get("source", "")
+    if platform == "x":
+        return "X / Twitter 重点舆情"
+    if platform == "youtube":
+        return "YouTube 核心内容"
+    if "TechCrunch" in source:
+        return "TechCrunch 深度文章"
+    if item.get("is_primary_source", False):
+        return "其他平台深度报道"
+    return "其他平台快讯"
+
+
 def section_attainment(candidates: List[Dict[str, str]]) -> Dict[str, int]:
-    counts = {
-        "X / Twitter 重点舆情": 0,
-        "YouTube 核心内容": 0,
-        "TechCrunch 深度文章": 0,
-        "其他平台快讯": 0,
-    }
+    counts = {name: 0 for name in SECTION_TARGETS}
     for item in candidates:
-        source = item.get("source", "")
-        platform = item.get("platform", "")
-        if platform == "x":
-            counts["X / Twitter 重点舆情"] += 1
-        elif platform == "youtube":
-            counts["YouTube 核心内容"] += 1
-        elif "TechCrunch" in source:
-            counts["TechCrunch 深度文章"] += 1
-        else:
-            counts["其他平台快讯"] += 1
+        counts[infer_section_name(item)] += 1
     return counts
+
+
+def select_prompt_candidates(filtered: List[Dict[str, str]], max_candidates: int) -> List[Dict[str, str]]:
+    grouped: Dict[str, List[Dict[str, str]]] = {name: [] for name in PROMPT_POOL_LIMITS}
+    for item in filtered:
+        grouped[infer_section_name(item)].append(item)
+
+    selected: List[Dict[str, str]] = []
+    seen = set()
+
+    def add_items(items: List[Dict[str, str]], limit: int) -> None:
+        for item in items[:limit]:
+            key = item.get("candidate_id") or item.get("url") or item.get("title")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            selected.append(item)
+
+    for section_name, limit in PROMPT_POOL_LIMITS.items():
+        add_items(grouped.get(section_name, []), limit)
+
+    if len(selected) < max_candidates:
+        for item in filtered:
+            key = item.get("candidate_id") or item.get("url") or item.get("title")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            selected.append(item)
+            if len(selected) >= max_candidates:
+                break
+
+    return selected[:max_candidates]
+
+
+def build_section_payload(candidates: List[Dict[str, str]]) -> Dict[str, List[Dict[str, str]]]:
+    grouped: Dict[str, List[Dict[str, str]]] = {name: [] for name in SECTION_TARGETS}
+    overall = sorted(candidates, key=lambda x: x.get("score", 0), reverse=True)
+    grouped["今日重点判断候选"] = overall[:12]
+    for item in candidates:
+        grouped[infer_section_name(item)].append(item)
+    payload: Dict[str, List[Dict[str, str]]] = {"今日重点判断候选": grouped["今日重点判断候选"]}
+    for name, target in SECTION_TARGETS.items():
+        payload[name] = grouped.get(name, [])[: max(target + 3, target)]
+    return payload
 
 
 def render_coverage_overview(config: Dict, candidates: List[Dict[str, str]], stats: Dict[str, Dict[str, object]]) -> str:
@@ -1153,8 +1220,9 @@ def collect_candidates(report_end_utc: datetime, focus: str, config: Dict) -> Tu
         filtered.append(item)
         stats[bucket_name]["passed"] = int(stats[bucket_name]["passed"]) + 1
     filtered.sort(key=lambda x: x.get("score", 0), reverse=True)
+    selected = select_prompt_candidates(filtered, config.get("max_candidates", 60))
     ordered_stats = dict(sorted(stats.items(), key=lambda kv: (-int(kv[1].get("passed", 0)), -int(kv[1].get("fetched", 0)), kv[0])))
-    return filtered[: config.get("max_candidates", 60)], ordered_stats
+    return selected, ordered_stats
 
 
 def summarize_platform_counts(candidates: List[Dict[str, str]]) -> str:
@@ -1179,15 +1247,17 @@ def build_system_prompt(skill_content: str, target_date: str, report_window: str
 5. 每条深度报道标题必须使用 Markdown 超链接：### [中文标题](原文链接)
 6. 任何“发布/推出/上线/开源/宣布”类重大事实，必须来自 primary source 候选（official/media/research）且 `published_verified=true`。
 7. 只允许使用报告窗口内且日期可核验的候选；超出窗口的内容一律丢弃。
-8. X / YouTube / Reddit / Hacker News 只能进入“观点 / 社区信号”或“快讯”，不能作为模型发布事实的一手依据。
+8. X / YouTube / Reddit / Hacker News 只能进入 X / YouTube 专栏或“其他平台快讯”，不能作为模型发布事实的一手依据。
 9. 如果候选没有可核验日期，必须直接弃用，不能写入日报。
 10. 本次报告窗口固定为：{report_window}。不要使用窗口外内容。
+11. 必须严格输出以下固定版块，不能省略，也不能改名：今日重点判断、X / Twitter 重点舆情、YouTube 核心内容、TechCrunch 深度文章、其他平台深度报道、其他平台快讯。
+12. X / YouTube 专栏即使条目较少也必须保留版块，并明确写出“本窗口内通过校验的条目较少”。
 """
 
 
 def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, str]], report_window: str) -> str:
     focus_instruction = FOCUS_PROMPTS.get(focus, FOCUS_PROMPTS[""])
-    payload = json.dumps(candidates, ensure_ascii=False, indent=2)
+    payload = json.dumps(build_section_payload(candidates), ensure_ascii=False, indent=2)
     platform_stats = summarize_platform_counts(candidates)
     return f"""请基于以下候选素材，生成 {target_date} 的 AI 每日日报。
 
@@ -1197,15 +1267,17 @@ def build_user_prompt(target_date: str, focus: str, candidates: List[Dict[str, s
 
 写作要求：
 - 按 SKILL 模板输出 Markdown
-- 保留最有价值的内容并去重
+- 严格按固定版块输出，版块顺序不可调整
 - 重点关注：AI 底层逻辑、商业落地、应用、使用方法、电商应用、未来趋势、最新发布
 - 官方发布、研究突破、商业落地优先
 - 不要编造候选中不存在的发布日期、数据或观点
-- 如果候选里某个平台质量低，可以少写，但不要用无关信息凑数
+- X / YouTube 专栏优先从对应候选池中选，不要被其他平台挤掉
 - 所有深度报道标题必须写成 `[标题](url)`，不得写“（含超链接）”占位词
 - 任何重大发布类表述都必须能在候选的 `published_verified=true` 且 `is_primary_source=true` 中找到依据
-- `is_signal_source=true` 的候选不要放进“深度报道”
+- `is_signal_source=true` 的候选不要放进“TechCrunch 深度文章”或“其他平台深度报道”
 - 只允许使用上述固定窗口内且日期可核验的候选；超出窗口的内容一律不要
+- 目标配额：X 至多 15 条、YouTube 至多 5 条、TechCrunch 至多 6 条、其他平台深度报道至多 6 条、其他平台快讯至多 12 条
+- 如果某版块候选不足，保留版块并写出实际数量，不要拿不相关平台硬凑
 
 候选素材如下：
 {payload}
@@ -1223,6 +1295,9 @@ def validate_generated_markdown(markdown: str, candidates: List[Dict[str, str]])
     current_url = ""
     candidate_map = {item.get("url", ""): item for item in candidates if item.get("url")}
     linked_urls = set(re.findall(r"\[[^\]]+\]\((https?://[^)]+)\)", markdown))
+    for heading in STRUCTURED_HEADINGS:
+        if heading not in markdown:
+            errors.append(f"缺少固定版块: {heading}")
 
     def flush_current():
         nonlocal current_title, current_source_line, current_date_line, current_url
@@ -1261,10 +1336,10 @@ def validate_generated_markdown(markdown: str, candidates: List[Dict[str, str]])
 
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("## 📌 深度报道"):
+        if stripped in DEEP_SECTION_HEADINGS:
             in_deep_section = True
             continue
-        if stripped.startswith("## ") and not stripped.startswith("## 📌 深度报道"):
+        if stripped.startswith("## ") and stripped not in DEEP_SECTION_HEADINGS:
             if in_deep_section:
                 flush_current()
             in_deep_section = False
@@ -1305,14 +1380,14 @@ def normalize_deep_report_metadata(markdown: str, candidates: List[Dict[str, str
     for line in lines:
         stripped = line.strip()
 
-        if stripped.startswith("## 📌 深度报道"):
+        if stripped in DEEP_SECTION_HEADINGS:
             in_deep_section = True
             current_candidate = None
             meta_written = False
             output.append(line)
             continue
 
-        if in_deep_section and stripped.startswith("## ") and not stripped.startswith("## 📌 深度报道"):
+        if in_deep_section and stripped.startswith("## ") and stripped not in DEEP_SECTION_HEADINGS:
             flush_missing_metadata()
             in_deep_section = False
             current_candidate = None
