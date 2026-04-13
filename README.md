@@ -1,182 +1,121 @@
-# 🤖 AI Daily Skill — 每日 AI 日报自动化系统
+# 🤖 AI 前沿日报
 
-每天北京时间 **08:20** 自动生成最新动态日报，
-由 DeepSeek API + 公开网页抓取生成高密度中文日报，
-并直接提交到 GitHub 仓库的 `reports/` 目录。
+> 每日自动抓取 12 个权威 AI 信息源，DeepSeek AI 深度解读，每天早上 08:00 自动推送到 GitHub。
 
----
-
-## 当前部署位置
-
-本机已部署到：
-
-`/Users/ye/Documents/Codex/ai-daily-skill`
-
-如果你要启用云端定时推送，需要把这个目录推到一个 GitHub 仓库，再配置 Secrets。
+[![Daily Report](https://github.com/odysseusyes/AI-Daily-Newspaper/actions/workflows/daily.yml/badge.svg)](https://github.com/odysseusyes/AI-Daily-Newspaper/actions/workflows/daily.yml)
 
 ---
 
-## 📁 目录结构
+## 📋 信息源覆盖
+
+| 分类 | 信息源 |
+|------|--------|
+| 🤖 大模型动态 | OpenAI Blog · Anthropic Blog · Google DeepMind · Mistral AI |
+| 📄 论文研究 | arXiv (AI/CV/ML) · Papers With Code |
+| 🛠️ 开源工具 | Hugging Face Blog · GitHub Trending AI |
+| 💡 行业观点 | The Batch (Andrew Ng) · Import AI (Jack Clark) |
+| 💬 社区讨论 | Hacker News AI 精选 |
+
+---
+
+## 🧠 AI 解读流程
 
 ```
-ai-daily-skill/
-├── skills/ai-daily/
-│   └── SKILL.md              # 技能定义（可直接用于 Claude Code / Codex）
-├── .github/workflows/
-│   └── daily.yml             # GitHub Actions 定时任务
-├── config/
-│   └── sources.json          # 平台与来源配置
-├── scripts/
-│   ├── generate_daily.py     # 抓多平台公开源并调用 DeepSeek 生成日报
-│   └── push_to_obsidian.py   # 可选：如后续需要再接入 Obsidian
-├── reports/                  # 每日日报归档（会自动提交到仓库）
-├── requirements.txt
-└── README.md
+多源抓取 (12源) → DeepSeek 评分(0-10) → 过滤低质量 → 深度解读(精选12条) → 快讯(8条) → 渲染HTML → 发布GitHub
 ```
 
----
-
-## 🚀 快速部署（10 分钟完成）
-
-### 第一步：Fork 仓库
-
-Fork 本项目到你的 GitHub 账号。
+每条深度解读包含：
+- **核心亮点** — 技术/产品突破
+- **为什么重要** — 行业影响
+- **实用价值** — 对 AI 从业者的直接帮助
+- **延伸思考** — 趋势预判
 
 ---
 
-### 第二步：配置 GitHub Secrets
+## 🚀 部署步骤（5分钟完成）
 
-在 GitHub 仓库 → **Settings → Secrets and variables → Actions** 中添加：
-
-| Secret 名称 | 说明 | 必填 |
-|------------|------|------|
-| `DEEPSEEK_API_KEY` | DeepSeek API Key | ✅ 必填 |
-| `TWITTERAPI_KEY` | twitterapi.io 的 X API Key（启用可核验时间的 X 抓取） | 可选 |
-| `TIKTOK_RAPIDAPI_KEY` | TikTok RapidAPI Key（启用 TikTok 补充源） | 可选 |
-| `TIKTOK_RAPIDAPI_HOST` | TikTok RapidAPI Host，默认 `tiktok-api23.p.rapidapi.com` | 可选 |
-
-> **获取 GitHub Token：**
-> Settings → Developer settings → Personal access tokens → Generate new token
-> 勾选 `repo` 权限即可
-
----
-
-### 第三步：启用 Actions
-
-1. 进入仓库 → **Actions** 标签页
-2. 点击 **"I understand my workflows, go ahead and enable them"**
-3. 手动触发一次测试：Actions → **AI Daily Digest** → **Run workflow**
-
----
-
-## ⚡ 手动触发参数
-
-| 参数 | 说明 | 示例 |
-|-----|------|------|
-| `date` | 指定输出文件日期，留空=今天 | `2026-04-09` |
-| `focus` | 聚焦方向 | `ecommerce` / `research` / `tools` |
-| `preview_only` | 保留参数，当前纯 GitHub 版忽略 | `true` |
-
----
-
-## 🔧 本地运行（可选）
+### 1. Fork / Clone 此仓库
 
 ```bash
-# 克隆项目
-git clone https://github.com/你的用户名/ai-daily-skill.git
-cd ai-daily-skill
+git clone https://github.com/odysseusyes/AI-Daily-Newspaper.git
+cd AI-Daily-Newspaper
+```
 
+### 2. 配置 GitHub Secrets
+
+在仓库 **Settings → Secrets and variables → Actions** 中添加：
+
+| Secret 名称 | 说明 |
+|-------------|------|
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥（必填） |
+
+> `GITHUB_TOKEN` 由 GitHub Actions 自动提供，无需手动配置。
+
+### 3. 开启 GitHub Pages
+
+**Settings → Pages → Source → Deploy from a branch → 选择 `main` 分支 `/docs` 目录**
+
+### 4. 触发首次运行
+
+**Actions → 📰 AI 日报自动生成 → Run workflow**
+
+首次运行约需 3-5 分钟。完成后可访问：
+
+```
+https://<你的用户名>.github.io/AI-Daily-Newspaper/
+```
+
+---
+
+## 📅 自动调度
+
+- **时间**：每天 UTC 00:00 = 北京时间 08:00
+- **平台**：GitHub Actions（免费，无需服务器）
+- **通知**：每次生成后自动创建 GitHub Issue，Watch 仓库即可收到邮件通知
+
+**订阅方式**：点击仓库右上角 **Watch → Custom → Issues** ✓ 即可每天收到邮件。
+
+---
+
+## 🛠️ 本地运行
+
+```bash
 # 安装依赖
 pip install -r requirements.txt
 
 # 设置环境变量
-export DEEPSEEK_API_KEY="sk-..."
+export DEEPSEEK_API_KEY="sk-xxxx"
+export GITHUB_TOKEN="ghp_xxxx"
+export GITHUB_REPO="odysseusyes/AI-Daily-Newspaper"
 
-# 生成今日日报
-python scripts/generate_daily.py --output reports/AI日报_$(date +%Y-%m-%d).md
+# 本地测试（不发布）
+python main.py --dry-run
+
+# 正常运行
+python main.py
 ```
 
 ---
 
-## 📱 Claude Code / Codex 直接使用
+## 📁 项目结构
 
-将 `skills/ai-daily/SKILL.md` 放入你的 Skills 目录：
-
-```bash
-# Claude Code
-cp -r skills/ai-daily ~/.claude/skills/
-
-# 然后在 Claude Code 中
-/ai-daily
+```
+.
+├── main.py              # 主入口
+├── fetcher.py           # 多源抓取（RSS + GitHub API）
+├── analyzer.py          # DeepSeek AI 评分 + 深度解读
+├── renderer.py          # HTML + Markdown 渲染
+├── publisher.py         # GitHub 自动发布
+├── requirements.txt     # Python 依赖
+├── .github/
+│   └── workflows/
+│       └── daily.yml    # GitHub Actions 调度
+├── docs/                # GitHub Pages（日报 HTML）
+│   ├── index.html       # 最新日报
+│   └── archive.json     # 历史归档索引
+└── reports/             # Markdown 版本归档
 ```
 
 ---
 
-## 📊 日报结构
-
-每份日报包含：
-
-- **🔥 今日重点判断 TOP5** — 5 条核心事件排序
-- **🐦 X / Twitter 重点舆情** — 固定专栏，优先保留白名单账号中的高价值动态
-- **📺 YouTube 核心内容** — 固定专栏，优先保留白名单频道中的高价值视频
-- **📌 TechCrunch 深度文章** — 固定专栏，输出深度摘要 + 关键判断 + 行动建议
-- **📰 其他平台深度报道** — 官方博客、研究和权威媒体的补充深度内容
-- **⚡ 其他平台快讯** — 3 句话内的补充动态
-
-时效规则：
-
-- 每天 **08:20 CST** 自动运行一次
-- 主窗口为：**当前生成时刻往前 36 小时**
-- 平台补位窗口：
-  - `X / Reddit / TikTok`：48 小时
-  - `YouTube`：72 小时
-- 例如：`2026-04-25 08:20` 生成时，主窗口覆盖 `2026-04-23 20:20` 到 `2026-04-25 08:20`
-- 超出对应窗口的旧内容直接丢弃；如果窗口内可核验内容不足，任务失败，不凑数
-
----
-
-## 🔑 数据源覆盖
-
-**媒体 / 官方 / 研究**
-- NYTimes Technology
-- TechCrunch AI
-- The Verge AI
-- VentureBeat AI
-- MIT Technology Review AI
-- Google Developers Blog
-- Google Cloud Blog
-- OpenAI News
-- Anthropic News
-- Google DeepMind Blog
-- Meta AI Blog
-- Hugging Face Papers
-- arXiv（cs.AI / cs.CL / cs.LG）
-
-**社区 / 社媒 / 视频**
-- Hacker News
-- Reddit（通过 Redlib 镜像）
-- X（`twitterapi.io` 优先，`r.jina.ai` 回退）
-- YouTube（通过 `r.jina.ai` 代理）
-- Product Hunt AI
-- TikTok（可选，需 RapidAPI Key）
-
-> 当前实现已经接入 X / Reddit / YouTube / Product Hunt。若配置 `TWITTERAPI_KEY`，X 会优先使用带 `createdAt` 的 API 结果；TikTok 需要额外 Secret 才会返回内容。
-
----
-
-## 💡 常见问题
-
-**Q：现在默认用什么模型？**
-A：默认用 `deepseek-chat`。如需切换，可在环境变量里设置 `DEEPSEEK_MODEL`。
-
-**Q：每次大概消耗多少 Token？**
-A：取决于当天抓到的候选条目数量。当前实现是“脚本抓源 + DeepSeek 归纳”，通常比直接联网搜索更可控。
-
-**Q：日报没有推送成功怎么排查？**
-A：先看 `生成 AI 日报` 和 `提交日报到仓库` 两步；若仓库里已有 `reports/AI日报_YYYY-MM-DD.md`，说明成功。
-
----
-
-## 📄 License
-
-MIT License
+*Powered by DeepSeek AI · 自动生成，每日更新*

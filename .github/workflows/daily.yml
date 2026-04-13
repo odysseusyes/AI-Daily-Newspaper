@@ -1,118 +1,77 @@
-name: 🤖 AI Daily Digest
+name: 📰 AI 日报自动生成
 
 on:
+  # 每天北京时间 08:00 = UTC 00:00
   schedule:
-    # 每天 UTC 00:20 = 北京时间 08:20
-    - cron: '20 0 * * *'
+    - cron: "0 0 * * *"
+
+  # 支持手动触发（在 Actions 页面点击 Run workflow）
   workflow_dispatch:
     inputs:
-      date:
-        description: '指定输出文件日期 (YYYY-MM-DD)，留空为今天'
+      dry_run:
+        description: "Dry run（只生成，不发布）"
         required: false
-        default: ''
-      focus:
-        description: '聚焦方向 (ecommerce/research/tools)，留空为全部'
-        required: false
-        default: ''
-      preview_only:
-        description: '保留参数，占位用；纯 GitHub 版会忽略此参数'
-        required: false
-        default: 'false'
+        default: "false"
+        type: boolean
 
 permissions:
-  contents: write
-
-concurrency:
-  group: ai-daily-main
-  cancel-in-progress: false
+  contents: write      # 提交文件
+  issues: write        # 创建 Issue 通知
 
 jobs:
-  generate-daily:
+  generate:
     name: 生成 AI 日报
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
-      - name: 📥 Checkout 仓库
-        uses: actions/checkout@v6
+      # ── 1. 检出代码 ────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. 配置 Python ─────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
-          fetch-depth: 0
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: 🔄 同步最新 main
-        run: |
-          git fetch origin main
-          git pull --ff-only origin main
+      # ── 3. 安装依赖 ─────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      - name: 🐍 配置 Python 环境
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: 📦 安装依赖
-        run: |
-          pip install -r requirements.txt --quiet
-
-      - name: 🗓️ 设置日期变量
-        id: date
-        run: |
-          if [ -n "${{ github.event.inputs.date }}" ]; then
-            REPORT_DATE="${{ github.event.inputs.date }}"
-          else
-            REPORT_DATE="$(TZ='Asia/Shanghai' date +%Y-%m-%d)"
-          fi
-          REPORT_NOW_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          WINDOW_RANGE="$(python -c "from datetime import datetime,timedelta,timezone; from zoneinfo import ZoneInfo; end_utc=datetime.strptime('${REPORT_NOW_UTC}','%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc); start_local=(end_utc-timedelta(hours=24)).astimezone(ZoneInfo('Asia/Shanghai')); end_local=end_utc.astimezone(ZoneInfo('Asia/Shanghai')); print(f'{start_local.strftime(\"%Y-%m-%d %H:%M\")} - {end_local.strftime(\"%Y-%m-%d %H:%M\")} (Asia/Shanghai)')" )"
-          echo "DATE=${REPORT_DATE}" >> $GITHUB_OUTPUT
-          echo "REPORT_NOW_UTC=${REPORT_NOW_UTC}" >> $GITHUB_OUTPUT
-          echo "WINDOW_RANGE=${WINDOW_RANGE}" >> $GITHUB_OUTPUT
-          echo "DATETIME=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M')" >> $GITHUB_OUTPUT
-
-      - name: 🔍 抓取并生成日报
+      # ── 4. 运行日报生成器 ─────────────────────
+      - name: Generate AI Daily News
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          DEEPSEEK_MODEL: deepseek-chat
-          TWITTERAPI_KEY: ${{ secrets.TWITTERAPI_KEY }}
-          TWITTERAPI_BASE_URL: https://api.twitterapi.io
-          TARGET_DATE: ${{ steps.date.outputs.DATE }}
-          REPORT_NOW_UTC: ${{ steps.date.outputs.REPORT_NOW_UTC }}
-          FOCUS: ${{ github.event.inputs.focus }}
-          TIKTOK_RAPIDAPI_KEY: ${{ secrets.TIKTOK_RAPIDAPI_KEY }}
-          TIKTOK_RAPIDAPI_HOST: ${{ secrets.TIKTOK_RAPIDAPI_HOST }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_BRANCH: main
         run: |
-          python scripts/generate_daily.py \
-            --date "$TARGET_DATE" \
-            --focus "$FOCUS" \
-            --output "reports/AI日报_$TARGET_DATE.md"
-
-      - name: 📝 提交日报到仓库
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports
-          if git diff --cached --quiet; then
-            echo "No report changes to commit."
-            exit 0
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python main.py --dry-run --local
+          else
+            python main.py --local
           fi
-          git commit -m "chore: daily AI report (${{ steps.date.outputs.DATE }})"
-          git push
 
-      - name: 💾 上传产物（备份）
+      # ── 5. 上传本地产物（备份）────────────────
+      - name: Upload output as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ai-daily-${{ steps.date.outputs.DATE }}
-          path: reports/AI日报_*.md
+          name: daily-report-${{ github.run_id }}
+          path: output/
           retention-days: 30
 
-      - name: ✅ 输出摘要
-        run: |
-          echo "## 📰 AI日报生成完成" >> $GITHUB_STEP_SUMMARY
-          echo "- **文件日期：** ${{ steps.date.outputs.DATE }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **时间窗口：** ${{ steps.date.outputs.WINDOW_RANGE }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **生成时间：** ${{ steps.date.outputs.DATETIME }} (北京时间)" >> $GITHUB_STEP_SUMMARY
-          echo "- **文件：** AI日报_${{ steps.date.outputs.DATE }}.md" >> $GITHUB_STEP_SUMMARY
-          echo "- **发布位置：** 仓库 reports/ 目录" >> $GITHUB_STEP_SUMMARY
-          if [ -f "reports/AI日报_${{ steps.date.outputs.DATE }}.md" ]; then
-            LINES=$(wc -l < "reports/AI日报_${{ steps.date.outputs.DATE }}.md")
-            echo "- **行数：** $LINES 行" >> $GITHUB_STEP_SUMMARY
-          fi
+      # ── 6. 失败通知（可选）───────────────────
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '❌ AI 日报生成失败 · ' + new Date().toISOString().slice(0,10),
+              body: `日报自动生成失败，请检查 Actions 日志：\n\n${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['bug', 'automated']
+            })
