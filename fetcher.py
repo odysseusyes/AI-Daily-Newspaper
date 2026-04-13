@@ -161,8 +161,8 @@ def _parse_date(entry) -> Optional[datetime]:
     return None
 
 
-def _is_today_or_yesterday(dt: Optional[datetime], cutoff_hours: int = 26) -> bool:
-    """只保留 cutoff_hours 小时内的内容（默认最近 26 小时，确保不漏）"""
+def _is_today_or_yesterday(dt: Optional[datetime], cutoff_hours: int = 72) -> bool:
+    """只保留 cutoff_hours 小时内的内容（默认 72 小时，确保周末/节假日不漏）"""
     if dt is None:
         return True  # 无时间戳的内容默认保留
     now = datetime.now(timezone.utc)
@@ -242,7 +242,7 @@ def fetch_github_trending(source: dict) -> list[dict]:
 # ─────────────────────────────────────────────
 #  主入口
 # ─────────────────────────────────────────────
-def fetch_all(cutoff_hours: int = 26) -> list[dict]:
+def fetch_all(cutoff_hours: int = 72) -> list[dict]:
     """抓取所有源，返回去重后的新闻列表"""
     all_items = []
     seen_ids = set()

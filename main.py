@@ -58,7 +58,7 @@ def run(dry_run: bool = False, local: bool = False) -> None:
 
     # ── Step 1: 抓取 ──────────────────────────
     logger.info("📡 Step 1: 抓取多源 AI 资讯 ...")
-    items = fetch_all(cutoff_hours=26)
+    items = fetch_all(cutoff_hours=72)
     logger.info(f"  抓取完成：{len(items)} 条")
 
     if not items:
@@ -80,26 +80,26 @@ def run(dry_run: bool = False, local: bool = False) -> None:
     logger.info("  渲染完成")
 
     # ── Step 4: 保存 / 发布 ───────────────────
-    if local or dry_run:
+    if dry_run:
         out_dir = Path("output")
         out_dir.mkdir(exist_ok=True)
         html_path = out_dir / f"{date_slug}.html"
         md_path = out_dir / f"{date_slug}.md"
         data_path = out_dir / f"{date_slug}_data.json"
-
         html_path.write_text(html_content, encoding="utf-8")
         md_path.write_text(md_content, encoding="utf-8")
         data_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        logger.info(f"📁 Dry-run：已保存到本地 {html_path}，不发布到 GitHub")
+        return
 
-        logger.info(f"📁 Step 4: 已保存到本地")
-        logger.info(f"  → {html_path}")
-        logger.info(f"  → {md_path}")
+    if local:
+        out_dir = Path("output")
+        out_dir.mkdir(exist_ok=True)
+        (out_dir / f"{date_slug}.html").write_text(html_content, encoding="utf-8")
+        (out_dir / f"{date_slug}.md").write_text(md_content, encoding="utf-8")
+        logger.info(f"📁 本地备份已保存到 output/")
 
-        if dry_run:
-            logger.info("  Dry-run 模式，不发布到 GitHub")
-            return
-
-    if not dry_run:
+    if True:  # always publish unless dry_run
         logger.info("🚀 Step 4: 发布到 GitHub ...")
         result = publish(html_content, md_content, data, date_slug)
         if result["success"]:
