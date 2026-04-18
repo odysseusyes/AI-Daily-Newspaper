@@ -16,7 +16,9 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from fetcher import fetch_all
-from analyzer import analyze_all
+from fetcher_twitter import fetch_twitter
+from fetcher_youtube import fetch_youtube
+from analyzer import analyze_all, analyze_youtube_video
 from renderer import render_html, render_markdown
 from publisher import publish
 
@@ -56,22 +58,52 @@ def run(dry_run: bool = False, local: bool = False) -> None:
     logger.info(f"  AI 前沿日报  ·  {date_str}")
     logger.info(f"═══════════════════════════════════════")
 
-    # ── Step 1: 抓取 ──────────────────────────
-    logger.info("📡 Step 1: 抓取多源 AI 资讯 ...")
+    # ── Step 1: RSS / GitHub 多源抓取 ──────────
+    logger.info("📡 Step 1: 抓取 RSS / GitHub AI 资讯 ...")
     items = fetch_all(cutoff_hours=72)
-    logger.info(f"  抓取完成：{len(items)} 条")
+    logger.info(f"  RSS 抓取完成：{len(items)} 条")
 
     if not items:
         logger.warning("  ⚠️  没有抓取到任何内容，退出")
         sys.exit(1)
 
+    # ── Step 1b: Twitter/X 舆情 ─────────────
+    logger.info("🐦 Step 1b: 抓取 X/Twitter AI 圈舆情 ...")
+    twitter_items = []
+    try:
+        twitter_items = fetch_twitter(cutoff_hours=48, max_accounts=50)
+        logger.info(f"  Twitter 完成：{len(twitter_items)} 条精选推文")
+    except Exception as e:
+        logger.warning(f"  Twitter 抓取失败（跳过）: {e}")
+
+    # ── Step 1c: YouTube 精选视频 ────────────
+    logger.info("📺 Step 1c: 搜索 YouTube AI 精华视频 ...")
+    youtube_items = []
+    try:
+        youtube_items = fetch_youtube(cutoff_hours=168)
+        logger.info(f"  YouTube 完成：{'找到精选视频 ' + youtube_items[0]['title'][:40] if youtube_items else '无结果'}")
+    except Exception as e:
+        logger.warning(f"  YouTube 抓取失败（跳过）: {e}")
+
     # ── Step 2: AI 评分 + 深度解读 ────────────
     logger.info("🧠 Step 2: DeepSeek AI 评分与解读 ...")
     data = analyze_all(items)
     logger.info(
-        f"  分析完成：精选 {len(data['deep_items'])} 条深度解读，"
+        f"  RSS 分析完成：精选 {len(data['deep_items'])} 条深度解读，"
         f"{len(data['quick_items'])} 条快讯"
     )
+
+    # ── Step 2b: YouTube 深度解读 ────────────
+    data["youtube_item"] = None
+    if youtube_items:
+        logger.info("  🎬 YouTube 精选视频深度解读 ...")
+        try:
+            data["youtube_item"] = analyze_youtube_video(youtube_items[0])
+        except Exception as e:
+            logger.warning(f"  YouTube 解读失败（跳过）: {e}")
+
+    # 将 Twitter 数据附加到 data
+    data["twitter_items"] = twitter_items
 
     # ── Step 3: 渲染 HTML + Markdown ─────────
     logger.info("🎨 Step 3: 渲染日报 ...")

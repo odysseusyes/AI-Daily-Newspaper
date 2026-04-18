@@ -17,6 +17,8 @@ CATEGORY_CONFIG = {
     "开源工具":   {"icon": "🛠️", "color": "#10b981"},
     "行业观点":   {"icon": "💡", "color": "#f59e0b"},
     "社区讨论":   {"icon": "💬", "color": "#8b5cf6"},
+    "X/Twitter":  {"icon": "🐦", "color": "#1d9bf0"},
+    "YouTube":    {"icon": "📺", "color": "#ff0000"},
     "其他":       {"icon": "📌", "color": "#6b7280"},
 }
 
@@ -145,6 +147,54 @@ HTML_TEMPLATE = """\
   .quick-title a:hover {{ color: var(--accent); }}
   .quick-reason {{ font-size: 12px; color: var(--muted); margin-top: 3px; }}
 
+  /* ── Twitter 卡片 ── */
+  .tw-card {{
+    display: flex; gap: 12px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }}
+  .tw-card:last-child {{ border-bottom: none; }}
+  .tw-avatar {{
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #1d9bf022; display: flex; align-items: center;
+    justify-content: center; font-size: 16px; flex-shrink: 0;
+  }}
+  .tw-body {{ flex: 1; min-width: 0; }}
+  .tw-author {{ font-size: 13px; font-weight: 700; color: #1d9bf0; margin-bottom: 4px; }}
+  .tw-text {{ font-size: 14px; color: var(--text); line-height: 1.6; word-break: break-word; }}
+  .tw-text a {{ color: var(--text); }}
+  .tw-text a:hover {{ color: #1d9bf0; }}
+  .tw-meta {{ display: flex; gap: 16px; margin-top: 6px; }}
+  .tw-stat {{ font-size: 11px; color: var(--muted); }}
+
+  /* ── YouTube 卡片 ── */
+  .yt-card {{
+    background: var(--surface);
+    border: 1px solid #ff000033;
+    border-radius: var(--radius);
+    overflow: hidden; margin-bottom: 16px;
+  }}
+  .yt-header {{
+    background: linear-gradient(135deg, #1a0000 0%, #1e293b 100%);
+    padding: 16px 20px; display: flex; gap: 14px; align-items: flex-start;
+  }}
+  .yt-thumb-placeholder {{
+    width: 120px; height: 68px; border-radius: 6px; flex-shrink: 0;
+    background: #ff000022; display: flex; align-items: center;
+    justify-content: center; font-size: 28px;
+  }}
+  .yt-info {{ flex: 1; min-width: 0; }}
+  .yt-title {{ font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.4; }}
+  .yt-title a {{ color: var(--text); }}
+  .yt-title a:hover {{ color: #ff4444; }}
+  .yt-channel {{ font-size: 12px; color: #ff4444; margin-bottom: 6px; }}
+  .yt-stats {{ display: flex; gap: 14px; flex-wrap: wrap; }}
+  .yt-stat {{ font-size: 11px; color: var(--muted); }}
+  .yt-analysis {{
+    padding: 16px 20px; font-size: 14px; color: #cbd5e1;
+    line-height: 1.85; border-top: 1px solid #ff000022;
+  }}
+  .yt-analysis strong {{ color: #e2e8f0; }}
+
   /* ── Footer ── */
   .footer {{
     text-align: center; font-size: 12px; color: var(--muted);
@@ -161,9 +211,10 @@ HTML_TEMPLATE = """\
   <p class="subtitle">{date_str} · DeepSeek 深度解读 · 每日 08:00 自动更新</p>
   <div class="stats">
     <div class="stat"><div class="stat-n">{total_sources}</div><div class="stat-l">信息源</div></div>
-    <div class="stat"><div class="stat-n">{total_fetched}</div><div class="stat-l">抓取条目</div></div>
-    <div class="stat"><div class="stat-n">{total_filtered}</div><div class="stat-l">AI 筛选</div></div>
+    <div class="stat"><div class="stat-n">{total_fetched}</div><div class="stat-l">RSS 条目</div></div>
+    <div class="stat"><div class="stat-n">{total_twitter}</div><div class="stat-l">Twitter 精选</div></div>
     <div class="stat"><div class="stat-n">{deep_count}</div><div class="stat-l">深度解读</div></div>
+    <div class="stat"><div class="stat-n">{has_youtube}</div><div class="stat-l">YouTube 精选</div></div>
   </div>
 </div>
 
@@ -178,6 +229,12 @@ HTML_TEMPLATE = """\
 <!-- MAIN -->
 <div class="main">
 
+  <!-- YouTube 精选 -->
+  {youtube_section_html}
+
+  <!-- Twitter/X 舆情 -->
+  {twitter_section_html}
+
   <!-- 深度解读 -->
   <div class="section-title"><span class="section-dot"></span>深度解读 · 精选 {deep_count} 条</div>
   {deep_cards_html}
@@ -189,7 +246,7 @@ HTML_TEMPLATE = """\
 
 <!-- FOOTER -->
 <div class="footer">
-  由 DeepSeek AI 自动生成 · 数据来源：arXiv / OpenAI / Anthropic / DeepMind / Hugging Face / GitHub Trending 等 {total_sources} 个权威源<br>
+  由 DeepSeek AI 自动生成 · 数据来源：arXiv / OpenAI / Anthropic / DeepMind / HuggingFace / X(Twitter) / YouTube 等 {total_sources} 个权威源<br>
   生成时间：{generated_at}
 </div>
 
@@ -243,6 +300,76 @@ def _render_quick_section(quick_items: list[dict]) -> str:
   {items_html}"""
 
 
+def _render_twitter_section(twitter_items: list[dict]) -> str:
+    if not twitter_items:
+        return ""
+    cards = ""
+    for item in twitter_items:
+        author = item.get("author", "unknown")
+        text = item.get("title", "")
+        url = item.get("url", "#")
+        likes = item.get("likes", 0)
+        rts = item.get("retweets", 0)
+        views = item.get("views", 0)
+        pub = (item.get("published_at") or "")[:16].replace("T", " ")
+        cards += f"""
+    <div class="tw-card">
+      <div class="tw-avatar">🐦</div>
+      <div class="tw-body">
+        <div class="tw-author"><a href="https://x.com/{author}" target="_blank" rel="noopener">@{author}</a></div>
+        <div class="tw-text"><a href="{url}" target="_blank" rel="noopener">{text}</a></div>
+        <div class="tw-meta">
+          {"<span class='tw-stat'>❤️ " + str(likes) + "</span>" if likes else ""}
+          {"<span class='tw-stat'>🔁 " + str(rts) + "</span>" if rts else ""}
+          {"<span class='tw-stat'>👁 " + str(views) + "</span>" if views else ""}
+          {"<span class='tw-stat'>🕐 " + pub + "</span>" if pub else ""}
+        </div>
+      </div>
+    </div>"""
+    return f"""
+  <div class="section-title">
+    <span class="section-dot" style="background:#1d9bf0"></span>X / Twitter · AI 圈精选推文
+  </div>
+  {cards}"""
+
+
+def _render_youtube_section(youtube_item: dict | None) -> str:
+    if not youtube_item:
+        return ""
+    title = youtube_item.get("title", "")
+    url = youtube_item.get("url", "#")
+    channel = youtube_item.get("channel", "")
+    views = youtube_item.get("view_count", 0)
+    likes = youtube_item.get("like_count", 0)
+    pub = (youtube_item.get("published_at") or "")[:10]
+    score = youtube_item.get("youtube_score", 0)
+    analysis_html = _markdown_to_html(youtube_item.get("analysis", "（AI 解读生成中...）"))
+
+    views_str = f"{views:,}" if views else "N/A"
+    likes_str = f"{likes:,}" if likes else "N/A"
+
+    return f"""
+  <div class="section-title">
+    <span class="section-dot" style="background:#ff4444"></span>YouTube · 本日精选 AI 视频
+  </div>
+  <div class="yt-card">
+    <div class="yt-header">
+      <div class="yt-thumb-placeholder">▶️</div>
+      <div class="yt-info">
+        <div class="yt-title"><a href="{url}" target="_blank" rel="noopener">{title}</a></div>
+        <div class="yt-channel">📺 {channel}</div>
+        <div class="yt-stats">
+          <span class="yt-stat">👁 {views_str} 次播放</span>
+          <span class="yt-stat">❤️ {likes_str}</span>
+          {"<span class='yt-stat'>📅 " + pub + "</span>" if pub else ""}
+          {"<span class='yt-stat'>⭐ 综合评分 " + str(score) + "</span>" if score else ""}
+        </div>
+      </div>
+    </div>
+    <div class="yt-analysis">{analysis_html}</div>
+  </div>"""
+
+
 def render_html(data: dict, date_str: str | None = None) -> str:
     """渲染完整 HTML 日报"""
     tz_cn = timezone(timedelta(hours=8))
@@ -251,21 +378,31 @@ def render_html(data: dict, date_str: str | None = None) -> str:
 
     deep_items = data.get("deep_items", [])
     quick_items = data.get("quick_items", [])
+    twitter_items = data.get("twitter_items", [])
+    youtube_item = data.get("youtube_item")
 
     deep_cards_html = "".join(
         _render_deep_card(item, i + 1) for i, item in enumerate(deep_items)
     )
     quick_section_html = _render_quick_section(quick_items)
+    twitter_section_html = _render_twitter_section(twitter_items)
+    youtube_section_html = _render_youtube_section(youtube_item)
+
+    total_sources = 14 + (1 if twitter_items else 0) + (1 if youtube_item else 0)
 
     return HTML_TEMPLATE.format(
         date_str=date_str,
-        total_sources=12,
+        total_sources=total_sources,
         total_fetched=data.get("total_fetched", 0),
         total_filtered=data.get("total_filtered", 0),
+        total_twitter=len(twitter_items),
+        has_youtube="✅" if youtube_item else "—",
         deep_count=len(deep_items),
         daily_summary=data.get("daily_summary", "").replace("\n", "<br>"),
         deep_cards_html=deep_cards_html,
         quick_section_html=quick_section_html,
+        twitter_section_html=twitter_section_html,
+        youtube_section_html=youtube_section_html,
         generated_at=now.strftime("%Y-%m-%d %H:%M CST"),
     )
 
@@ -310,6 +447,38 @@ def render_markdown(data: dict, date_str: str | None = None) -> str:
             "",
         ]
 
+    # YouTube 精选
+    yt = data.get("youtube_item")
+    if yt:
+        lines += [
+            "## 📺 YouTube · 本日精选 AI 视频",
+            "",
+            f"### [{yt['title']}]({yt['url']})",
+            "",
+            f"**频道：** {yt.get('channel', 'N/A')}  |  "
+            f"**播放：** {yt.get('view_count', 0):,}  |  "
+            f"**发布：** {(yt.get('published_at') or '')[:10]}",
+            "",
+            yt.get("analysis", ""),
+            "",
+            "---",
+            "",
+        ]
+
+    # Twitter 精选
+    twitter_items = data.get("twitter_items", [])
+    if twitter_items:
+        lines += ["## 🐦 X / Twitter · AI 圈精选推文", ""]
+        for tw in twitter_items:
+            author = tw.get("author", "")
+            text = tw.get("title", "")
+            url = tw.get("url", "#")
+            likes = tw.get("likes", 0)
+            rts = tw.get("retweets", 0)
+            stats = f"❤️{likes} 🔁{rts}" if (likes or rts) else ""
+            lines.append(f"- **@{author}**: [{text[:100]}]({url}){f'  `{stats}`' if stats else ''}")
+        lines += ["", "---", ""]
+
     if data.get("quick_items"):
         lines += ["## 今日快讯", ""]
         for item in data["quick_items"]:
@@ -317,8 +486,9 @@ def render_markdown(data: dict, date_str: str | None = None) -> str:
             lines.append(f"- [{item['title']}]({item['url']}) — {item['source_name']}{f'  *{reason}*' if reason else ''}")
         lines += ["", "---", ""]
 
+    total_sources = 14 + (1 if twitter_items else 0) + (1 if yt else 0)
     lines += [
-        f"*生成时间：{now.strftime('%Y-%m-%d %H:%M CST')}  |  数据来源：12 个权威 AI 信息源*",
+        f"*生成时间：{now.strftime('%Y-%m-%d %H:%M CST')}  |  数据来源：{total_sources} 个 AI 权威信息源*",
     ]
 
     return "\n".join(lines)

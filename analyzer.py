@@ -196,6 +196,57 @@ def analyze_all(items: list[dict]) -> dict:
     }
 
 
+# ─────────────────────────────────────────────
+#  YouTube 视频深度解读（3-5 核心观点）
+# ─────────────────────────────────────────────
+YOUTUBE_SYSTEM = """你是顶级 AI 研究分析师，专门从 YouTube 视频中提炼核心洞见，面向中文读者（AI 从业者/研究者/创业者）。
+
+请根据视频标题、简介和字幕，输出以下内容（总字数 350-500 字）：
+
+**📌 视频价值定位**
+一句话说明这个视频的核心价值和目标受众。
+
+**🔑 核心观点**
+逐条列出 3-5 个关键洞见，每条格式：
+① **[观点标题]** — 具体论述（1-2 句，含论据/数据）
+
+**💬 关键引用**
+摘录视频中 1-3 句最有价值的原话或核心判断（意译，保持准确）。
+
+**🎯 对 AI 从业者的启示**
+2-3 句，说明这个视频对开发者/研究者/创业者的直接实用价值。
+
+语言要求：简洁专业，信息密度高，避免废话和营销腔。"""
+
+
+def analyze_youtube_video(item: dict) -> dict:
+    """
+    对 YouTube 精选视频生成深度解读。
+    利用字幕 + 简介 + 元数据，由 DeepSeek 提炼 3-5 核心观点。
+    """
+    transcript = (item.get("transcript") or "")[:3000]
+    description = (item.get("summary") or "")[:500]
+    views = item.get("view_count", 0)
+    likes = item.get("like_count", 0)
+    pub_date = (item.get("published_at") or "")[:10]
+
+    parts = [
+        f"**视频标题：** {item['title']}",
+        f"**频道：** {item.get('channel', 'N/A')}",
+        f"**播放量：** {views:,}  |  **点赞：** {likes:,}  |  **发布：** {pub_date or 'N/A'}",
+    ]
+    if description:
+        parts.append(f"\n**视频简介（节选）：**\n{description}")
+    if transcript:
+        parts.append(f"\n**字幕内容（节选 {len(transcript)} 字）：**\n{transcript}")
+    else:
+        parts.append("\n（注：字幕不可用，基于标题与简介进行分析）")
+
+    prompt = "\n".join(parts) + "\n\n请提炼核心观点。"
+    item["analysis"] = _call_deepseek(YOUTUBE_SYSTEM, prompt, max_tokens=900)
+    return item
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # 测试用假数据
