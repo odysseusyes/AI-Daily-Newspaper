@@ -172,7 +172,7 @@ def _is_today_or_yesterday(dt: Optional[datetime], cutoff_hours: int = 72) -> bo
 # ─────────────────────────────────────────────
 #  RSS 抓取
 # ─────────────────────────────────────────────
-def fetch_rss(source: dict, cutoff_hours: int = 26) -> list[dict]:
+def fetch_rss(source: dict, cutoff_hours: int = 72) -> list[dict]:
     items = []
     try:
         feed = feedparser.parse(source["url"])
