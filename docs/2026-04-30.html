@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 日报 · 2026年04月30日 周四</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #273344;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #6366f1;
+    --border: #334155; --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'PingFang SC','Helvetica Neue',sans-serif; line-height: 1.7; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── 顶部 Header ── */
+  .header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 24px 32px;
+    text-align: center;
+  }
+  .header-badge {
+    display: inline-block; background: var(--accent);
+    color: #fff; font-size: 12px; font-weight: 700;
+    padding: 4px 12px; border-radius: 999px; letter-spacing: .05em;
+    margin-bottom: 14px;
+  }
+  .header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.02em; }
+  .header .subtitle { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .stats { display: flex; justify-content: center; gap: 24px; margin-top: 20px; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat-n { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .stat-l { font-size: 12px; color: var(--muted); }
+
+  /* ── 导语 ── */
+  .summary-box {
+    max-width: 860px; margin: 32px auto; padding: 0 20px;
+  }
+  .summary-card {
+    background: linear-gradient(135deg, #1e1b4b 0%, #1e293b 100%);
+    border: 1px solid #4338ca44;
+    border-radius: var(--radius); padding: 24px 28px;
+  }
+  .summary-title { font-size: 13px; font-weight: 700; color: #818cf8; letter-spacing: .1em; margin-bottom: 12px; }
+  .summary-text { font-size: 15px; line-height: 1.8; color: #c7d2fe; }
+
+  /* ── 主体内容 ── */
+  .main { max-width: 860px; margin: 0 auto; padding: 0 20px 60px; }
+  .section-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 700; color: var(--muted);
+    letter-spacing: .1em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px; margin: 36px 0 20px;
+  }
+  .section-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* ── 深度解读卡片 ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: #6366f166; }
+  .card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; padding: 3px 9px;
+    border-radius: 999px; white-space: nowrap;
+  }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .card-title a { color: var(--text); }
+  .card-title a:hover { color: var(--accent); }
+  .card-source { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .analysis {
+    background: var(--surface2); border-radius: 8px;
+    padding: 16px 18px; font-size: 14px; color: #cbd5e1; line-height: 1.8;
+    border-left: 3px solid var(--accent);
+  }
+  .analysis strong { color: #e2e8f0; }
+
+  /* ── 快讯列表 ── */
+  .quick-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .quick-item:last-child { border-bottom: none; }
+  .quick-num { font-size: 12px; color: var(--muted); min-width: 20px; margin-top: 2px; }
+  .quick-body { flex: 1; }
+  .quick-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .quick-title a { color: var(--text); }
+  .quick-title a:hover { color: var(--accent); }
+  .quick-reason { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; font-size: 12px; color: var(--muted);
+    padding: 24px; border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-badge">AI DAILY NEWS</div>
+  <h1>🤖 AI 前沿日报</h1>
+  <p class="subtitle">2026年04月30日 周四 · DeepSeek 深度解读 · 每日 08:00 自动更新</p>
+  <div class="stats">
+    <div class="stat"><div class="stat-n">12</div><div class="stat-l">信息源</div></div>
+    <div class="stat"><div class="stat-n">551</div><div class="stat-l">抓取条目</div></div>
+    <div class="stat"><div class="stat-n">25</div><div class="stat-l">AI 筛选</div></div>
+    <div class="stat"><div class="stat-n">9</div><div class="stat-l">深度解读</div></div>
+  </div>
+</div>
+
+<!-- DAILY SUMMARY -->
+<div class="summary-box">
+  <div class="summary-card">
+    <div class="summary-title">✦ 今日导语</div>
+    <div class="summary-text">今天的AI圈，一场关于“智能体”的军备竞赛正在加速。NVIDIA开源了Nemotron 3 Nano Omni，将长上下文多模态能力注入文档、音频和视频代理，让“全能助手”的想象更近一步；而OpenAI则选择与AWS深度绑定，将Codex和托管代理带入企业级云服务，同时宣布其计算基础设施计划，为“智能时代”铺路。最值得关注的开源项目是**Co-Director**，它用多智能体协作实现了生成式视频叙事，让AI从“画图”进化到“导演”。今天整体AI生态的动向是：**从单点能力竞赛转向“基础设施+智能体”的协同进化**，大厂与开源社区都在为AI的规模化落地铺路。</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- 深度解读 -->
+  <div class="section-title"><span class="section-dot"></span>深度解读 · 精选 9 条</div>
+  
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#10b98122;color:#10b981">🛠️ 开源工具</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 8/10</span>
+    </div>
+    <div class="card-title"><a href="https://huggingface.co/blog/nvidia/nemotron-3-nano-omni-multimodal-intelligence" target="_blank" rel="noopener">Introducing NVIDIA Nemotron 3 Nano Omni: Long-Context Multimodal Intelligence for Documents, Audio and Video Agents</a></div>
+    <div class="card-source">来源：Hugging Face Blog · 2026-04-28</div>
+    <div class="analysis">好的，这是根据您的要求生成的深度解读：<br><br><strong>核心亮点</strong><br>NVIDIA推出Nemotron 3 Nano Omni，一个能在单GPU上运行的长上下文多模态模型，可同时处理文档、音频和视频。<br><br><strong>为什么重要</strong><br>这标志着多模态AI从“理解”迈向“原生处理”的关键一步。它打破了不同模态（文本、音频、视频）之间的处理壁垒，为构建真正的“全能”AI Agent提供了基础模型，显著降低了多模态应用的部署门槛。<br><br><strong>实用价值</strong><br>开发者可直接利用该模型构建能“看懂”视频、“听懂”音频并“阅读”文档的智能体。例如，用于自动分析会议录像并生成摘要、从长视频中检索特定对话片段、或构建能根据用户语音指令操作复杂文档的虚拟助手。<br><br><strong>延伸思考</strong><br>随着多模态模型在单卡上实现长上下文推理，AI Agent将从“对话式”工具进化为“环境式”助手，实时理解并响应我们周围的多维信息流。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#6366f122;color:#6366f1">🤖 大模型动态</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://openai.com/index/building-the-compute-infrastructure-for-the-intelligence-age" target="_blank" rel="noopener">Building the compute infrastructure for the Intelligence Age</a></div>
+    <div class="card-source">来源：OpenAI Blog · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>OpenAI通过“星门计划”（Stargate）大规模扩建计算基础设施，新增数据中心容量以支撑AGI（通用人工智能）的算力需求，标志着AI基础设施从实验性部署转向工业化规模。<br><br><strong>为什么重要</strong>  <br>此举直接回应了AI算力瓶颈——当前模型训练与推理的算力需求呈指数级增长，而现有数据中心难以满足。OpenAI的规模化投入将加速AGI研发进程，并推动行业从“模型竞赛”转向“基础设施竞赛”，倒逼其他玩家跟进或寻找差异化路径（如边缘计算、模型压缩）。<br><br><strong>实用价值</strong>  <br>- <strong>开发者</strong>：更稳定的API服务与更低延迟，支持实时交互应用（如Agent、多模态助手）。  <br>- <strong>创业者</strong>：可基于OpenAI的算力底座开发高计算需求产品（如视频生成、科学模拟），无需自建昂贵集群。  <br>- <strong>企业用户</strong>：降低AI部署门槛，尤其对需要大规模推理的行业（客服、医疗影像分析）。<br><br><strong>延伸思考</strong>  <br>当算力成为AGI的“新石油”，地缘政治与能源消耗将决定下一阶段AI竞争格局——谁控制计算资源，谁就掌握智能时代的钥匙。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#6366f122;color:#6366f1">🤖 大模型动态</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://openai.com/index/openai-on-aws" target="_blank" rel="noopener">OpenAI models, Codex, and Managed Agents come to AWS</a></div>
+    <div class="card-source">来源：OpenAI Blog · 2026-04-28</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>OpenAI将GPT模型、Codex及Managed Agents引入AWS，允许企业在AWS环境中直接调用这些模型，实现安全、可控的AI部署。<br><br><strong>为什么重要</strong>  <br>此举打破OpenAI模型仅限自有云的限制，满足企业对数据隐私、合规性和低延迟的刚需，加速AI在金融、医疗等敏感行业的落地。同时，AWS的生态集成降低了企业从实验到生产的门槛，推动AI基础设施向混合云演进。<br><br><strong>实用价值</strong>  <br>开发者可直接在AWS上通过API调用GPT-4、Codex等模型，结合S3、Lambda等服务构建定制化AI应用（如智能客服、代码审查）。企业无需担心数据外泄，利用AWS的IAM、VPC等安全机制管理模型访问权限，尤其适合处理客户数据或内部文档的私有化场景。<br><br><strong>延伸思考</strong>  <br>OpenAI与AWS的合作标志着AI模型从“通用API”向“企业级托管服务”转型，未来更多模型将嵌入云厂商生态，AI能力将像数据库一样成为云原生基础设施的标配。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#0ea5e922;color:#0ea5e9">📄 论文研究</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://arxiv.org/abs/2604.24842" target="_blank" rel="noopener">Co-Director: Agentic Generative Video Storytelling</a></div>
+    <div class="card-source">来源：arXiv · AI · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>Co-Director提出层次化多智能体框架，通过协同机制解决视频生成中语义漂移与级联错误，实现从片段到连贯故事的自动化叙事。<br><br><strong>为什么重要</strong>  <br>突破扩散模型在长视频叙事中的结构性瓶颈，将AI视频生成从“单镜头生成”推向“多镜头故事编排”，为影视级自动创作奠定技术基础。<br><br><strong>实用价值</strong>  <br>- 创作者：可快速生成剧情连贯的短视频/预告片，减少人工分镜与剪辑成本  <br>- 开发者：提供模块化叙事管线参考，降低多智能体系统的手工提示设计复杂度  <br>- 创业者：可集成至AI影视工具链，用于广告、教育等场景的自动化内容生产<br><br><strong>延伸思考</strong>  <br>当AI能自主导演故事时，人类创作者的角色将从“执行者”转向“叙事架构师”，人机协作的创作范式将重新定义内容产业。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#0ea5e922;color:#0ea5e9">📄 论文研究</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://arxiv.org/abs/2604.24881" target="_blank" rel="noopener">Latent Agents: A Post-Training Procedure for Internalized Multi-Agent Debate</a></div>
+    <div class="card-source">来源：arXiv · AI · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>提出“潜在智能体”后训练方法，通过两阶段微调将多智能体辩论能力蒸馏至单一LLM，显著降低推理计算开销。<br><br><strong>为什么重要</strong>  <br>传统多智能体辩论需生成冗长对话记录，计算成本高昂。该工作首次实现辩论过程“内化”，使单模型在保持推理质量的同时，将推理效率提升至接近直接问答水平，为高效推理范式开辟新路径。<br><br><strong>实用价值</strong>  <br>- <strong>开发者</strong>：可直接采用该微调流程，将复杂多轮辩论能力压缩至轻量模型，适用于资源受限场景（如移动端、边缘部署）。  <br>- <strong>用户</strong>：使用经此训练的模型，可在不牺牲逻辑严谨性的前提下获得更快响应，尤其适合需要深度推理的问答、代码生成等任务。  <br><br><strong>延伸思考</strong>  <br>“内化辩论”或将成为下一代LLM训练标配——当模型学会自我博弈，外部多智能体协作可能被更高效的内部推理机制取代。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#0ea5e922;color:#0ea5e9">📄 论文研究</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://arxiv.org/abs/2604.24983" target="_blank" rel="noopener">Adaptive Prompt Embedding Optimization for LLM Jailbreaking</a></div>
+    <div class="card-source">来源：arXiv · AI · 2026-04-29</div>
+    <div class="analysis">好的，这是根据您提供的论文信息生成的深度解读：<br><br><strong>核心亮点</strong><br>提出一种针对LLM的“自适应提示嵌入优化”越狱方法，直接在连续嵌入空间而非离散词元空间优化扰动，实现更隐蔽且高效的攻击。<br><br><strong>为什么重要</strong><br>突破了传统越狱攻击依赖“对抗性后缀”的局限，揭示了LLM安全对齐在嵌入层面的脆弱性。这迫使防御方必须从模型内部表征层面重新设计鲁棒性机制，而非仅依赖表面文本过滤。<br><br><strong>实用价值</strong><br>对AI安全开发者：提供了一种更接近模型内部工作原理的测试范式，可用于评估自身模型对嵌入级攻击的抵抗力。对普通用户：警示了看似无害的提示可能被微调后绕过安全护栏，需警惕输入被恶意篡改的风险。<br><br><strong>延伸思考</strong><br>当攻击从离散词元转向连续嵌入，未来的安全对齐或将需要“对抗性嵌入训练”作为标准组件。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#10b98122;color:#10b981">🛠️ 开源工具</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://huggingface.co/blog/evaleval/eval-costs-bottleneck" target="_blank" rel="noopener">AI evals are becoming the new compute bottleneck</a></div>
+    <div class="card-source">来源：Hugging Face Blog · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>AI评估（evals）正取代算力成为模型开发的新瓶颈，评估效率与质量直接决定模型迭代速度。<br><br><strong>为什么重要</strong>  <br>传统“堆算力”范式失效，模型能力提升需依赖更精准、自动化的评估体系。这标志着AI开发从“训练驱动”转向“验证驱动”，评估工具链（如基准测试、对抗测试、人类反馈系统）将成为基础设施级竞争焦点。<br><br><strong>实用价值</strong>  <br>开发者需优先投资自动化评估流水线（如单元测试式评估、多维度评分卡），而非盲目扩大训练规模。创业者可切入评估SaaS、合成数据生成、红队测试等细分赛道，降低模型迭代的试错成本。<br><br><strong>延伸思考</strong>  <br>当评估成为新瓶颈，谁能定义“好模型”的标准，谁就能掌握AI生态的话语权。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#10b98122;color:#10b981">🛠️ 开源工具</span>
+      <span class="badge" style="background:#f59e0b22;color:#f59e0b">⭐ 重要 7/10</span>
+    </div>
+    <div class="card-title"><a href="https://huggingface.co/blog/ibm-granite/granite-4-1" target="_blank" rel="noopener">Granite 4.1 LLMs: How They’re Built</a></div>
+    <div class="card-source">来源：Hugging Face Blog · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>IBM发布Granite 4.1系列LLM，重点公开其训练数据清洗、多阶段对齐及混合专家架构（MoE）的工程细节，显著提升代码生成与推理任务表现。<br><br><strong>为什么重要</strong>  <br>该模型展示了企业级LLM在可控性、领域适配性上的突破，尤其通过“数据质量优先”策略，证明小规模高质量数据可超越大规模低质数据的效果，为行业提供可复用的训练范式。<br><br><strong>实用价值</strong>  <br>开发者可直接利用其开源权重（Apache 2.0）构建垂直领域应用（如金融、医疗文档分析），其MoE架构降低推理成本约30%；创业者可借鉴其“数据筛选+任务对齐”流程优化自有模型。<br><br><strong>延伸思考</strong>  <br>Granite 4.1或预示未来LLM竞争将从“参数规模”转向“数据工程精度”，中小团队有望通过精细化数据策略实现弯道超车。</div>
+  </div>
+  <div class="card">
+    <div class="card-meta">
+      <span class="badge" style="background:#6366f122;color:#6366f1">🤖 大模型动态</span>
+      <span class="badge" style="background:#6366f122;color:#6366f1">📌 关注 6/10</span>
+    </div>
+    <div class="card-title"><a href="https://openai.com/index/cybersecurity-in-the-intelligence-age" target="_blank" rel="noopener">Cybersecurity in the Intelligence Age</a></div>
+    <div class="card-source">来源：OpenAI Blog · 2026-04-29</div>
+    <div class="analysis"><strong>核心亮点</strong>  <br>OpenAI提出五步行动计划，核心是推动AI驱动的网络防御民主化，并保护关键系统免受智能时代威胁。<br><br><strong>为什么重要</strong>  <br>这标志着AI安全从被动应对转向主动防御，通过降低AI工具的使用门槛，有望缩小攻击者与防御者之间的技术差距，重塑网络安全行业格局。<br><br><strong>实用价值</strong>  <br>对开发者：可集成OpenAI的防御模型，自动化威胁检测与响应；对创业者：可基于该计划开发低成本安全SaaS产品；对用户：未来或能获得更智能的防钓鱼、反勒索软件工具。<br><br><strong>延伸思考</strong>  <br>AI网络安全的未来在于“以智攻智”，但防御民主化也可能被恶意利用，需同步建立监管与伦理框架。</div>
+  </div>
+
+  <!-- 快讯 -->
+  
+  <div class="section-title"><span class="section-dot" style="background:#f59e0b"></span>今日快讯</div>
+  
+    <div class="quick-item">
+      <div class="quick-num">01</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.25000" target="_blank" rel="noopener">Toward a Science of Intent: Closure Gaps and Delegation Envelopes for Open-World AI Agents</a>
+        </div>
+        <div class="quick-reason">arXiv · AI</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">02</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.24885" target="_blank" rel="noopener">VibeToken: Scaling 1D Image Tokenizers and Autoregressive Models for Dynamic Resolution Generations</a>
+        </div>
+        <div class="quick-reason">arXiv · 计算机视觉</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">03</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.24831" target="_blank" rel="noopener">FGDM: Reasoning Aware Multi-Agentic Framework for Software Bug Detection using Chain of Thought and Tree of Thought Prompting</a>
+        </div>
+        <div class="quick-reason">arXiv · 机器学习</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">04</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#6366f1">🤖</span>
+          <a href="https://openai.com/index/openai-available-at-fedramp-moderate" target="_blank" rel="noopener">OpenAI available at FedRAMP Moderate</a>
+        </div>
+        <div class="quick-reason">OpenAI Blog</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">05</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#10b981">🛠️</span>
+          <a href="https://huggingface.co/blog/inference-providers-deepinfra" target="_blank" rel="noopener">DeepInfra on Hugging Face Inference Providers 🔥</a>
+        </div>
+        <div class="quick-reason">Hugging Face Blog</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">06</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.24996" target="_blank" rel="noopener">Sparse Personalized Text Generation with Multi-Trajectory Reasoning</a>
+        </div>
+        <div class="quick-reason">arXiv · AI</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">07</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.24919" target="_blank" rel="noopener">Agentic AI for Remote Sensing: Technical Challenges and Research Directions</a>
+        </div>
+        <div class="quick-reason">arXiv · 计算机视觉</div>
+      </div>
+    </div>
+    <div class="quick-item">
+      <div class="quick-num">08</div>
+      <div class="quick-body">
+        <div class="quick-title">
+          <span style="color:#0ea5e9">📄</span>
+          <a href="https://arxiv.org/abs/2604.25072" target="_blank" rel="noopener">Beyond Accuracy: Benchmarking Cross-Task Consistency in Unified Multimodal Models</a>
+        </div>
+        <div class="quick-reason">arXiv · 计算机视觉</div>
+      </div>
+    </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  由 DeepSeek AI 自动生成 · 数据来源：arXiv / OpenAI / Anthropic / DeepMind / Hugging Face / GitHub Trending 等 12 个权威源<br>
+  生成时间：2026-04-30 10:46 CST
+</div>
+
+</body>
+</html>
